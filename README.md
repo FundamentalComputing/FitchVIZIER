@@ -24,3 +24,8 @@ python3 -m http.server 8080
 ```
 
 And then open [http://localhost:8080/](http://localhost:8080/) in your favorite web browser.
+
+The CLI interface can be used as follows: the first argument is a file
+with the proof; the STDIN contains the "template" (e.g. the statement
+that has to be proven). The CLI then checks that the proof is correct
+and that it proves the statement that was provided via STDIN.
