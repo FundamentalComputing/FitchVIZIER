@@ -34,7 +34,7 @@ function fix_line_numbers() {
 function to_latex() {
   let latex = export_to_latex(document.getElementById("proof-field").value);
   sessionStorage.setItem("latex-exported-proof", latex);
-  window.open("latex_export.html", "_blank");
+  window.open("latex_export", "_blank");
 }
 
 let advanced_settings_are_visible = false;

@@ -7,12 +7,15 @@
 </head>
 
 <body>
-    <strong style="font-size:50px;color:white;">Fitch<em>VIZIER</em></strong><br>
+  <script type="module">
+    import './src/style.css'
+  </script>
+  <strong style="font-size:50px;color:white;">Fitch<em>VIZIER</em></strong><br>
   <br><br>
 
   <h1>LaTeX export:</h1>
   <textarea spellcheck="false" disabled rows=30 cols=90 id="latex-export-field">
-</textarea><br>
+  </textarea><br>
 
   <br>
   <div>Note that the LaTeX might not compile if the proof you exported was in a very bad state.
@@ -44,30 +47,30 @@
     <br>
     <br>
     <textarea disabled rows="26" cols="50">
-\setkeys{fitch}{indent=1em,depth=0.6em,height=1.7em}
-\renewcommand{\ndjustformat}[2]{#1: #2}
-\def\ndrules{
-\def\ii{\by{$\rightarrow\,$Intro}}
-\def\ie{\by{$\rightarrow\,$Elim}}
-\def\idi{\by{$=\,$Intro}{}}
-\def\ide{\by{$=\,$Elim}}
-\def\Ai{\by{$\forall\,$Intro}}
-\def\Ae{\by{$\forall\,$Elim}}
-\def\Ei{\by{$\exists\,$Intro}}
-\def\Ee{\by{$\exists\,$Elim}}
-\def\ai{\by{$\wedge\,$Intro}}
-\def\ae{\by{$\wedge\,$Elim}}
-\def\ai{\by{$\wedge\,$Intro}}
-\def\ae{\by{$\wedge\,$Elim}}
-\def\oi{\by{$\vee\,$Intro}}
-\def\oe{\by{$\vee\,$Elim}}
-\def\ni{\by{$\neg\,$Intro}}
-\def\ne{\by{$\neg\,$Elim}}
-\def\bi{\by{$\bot\,$Intro}}
-\def\be{\by{$\bot\,$Elim}}
-\def\bci{\by{$\leftrightarrow\,$Intro}}
-\def\bce{\by{$\leftrightarrow\,$Elim}}
-\def\r{\by{Reit}}}
+      \setkeys{fitch}{indent=1em,depth=0.6em,height=1.7em}
+      \renewcommand{\ndjustformat}[2]{#1: #2}
+      \def\ndrules{
+      \def\ii{\by{$\rightarrow\,$Intro}}
+      \def\ie{\by{$\rightarrow\,$Elim}}
+      \def\idi{\by{$=\,$Intro}{}}
+      \def\ide{\by{$=\,$Elim}}
+      \def\Ai{\by{$\forall\,$Intro}}
+      \def\Ae{\by{$\forall\,$Elim}}
+      \def\Ei{\by{$\exists\,$Intro}}
+      \def\Ee{\by{$\exists\,$Elim}}
+      \def\ai{\by{$\wedge\,$Intro}}
+      \def\ae{\by{$\wedge\,$Elim}}
+      \def\ai{\by{$\wedge\,$Intro}}
+      \def\ae{\by{$\wedge\,$Elim}}
+      \def\oi{\by{$\vee\,$Intro}}
+      \def\oe{\by{$\vee\,$Elim}}
+      \def\ni{\by{$\neg\,$Intro}}
+      \def\ne{\by{$\neg\,$Elim}}
+      \def\bi{\by{$\bot\,$Intro}}
+      \def\be{\by{$\bot\,$Elim}}
+      \def\bci{\by{$\leftrightarrow\,$Intro}}
+      \def\bce{\by{$\leftrightarrow\,$Elim}}
+      \def\r{\by{Reit}}}
     </textarea>
     <br><br>
     That's all!
