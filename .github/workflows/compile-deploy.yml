@@ -39,6 +39,7 @@ jobs:
       - name: Install WASM-pack
         run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
       - name: Build to WASM
+        working-directory: ./fitch-proof
         run: pnpm install && pnpm build
       - name: Setup Pages
         uses: actions/configure-pages@v5
