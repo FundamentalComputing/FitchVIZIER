@@ -6,12 +6,10 @@ import * as monaco from 'monaco-editor/esm/vs/editor/editor.api';
 
 
 const editor = monaco.editor.create(document.getElementById('editor'), {
-  value: `function hello() {
-    console.log("Hello, Monaco Editor!");
-    return "Welcome to Monaco!";
-}
-
-hello();`,
+  value: `
+1 | A
+  |----
+2 | A           Reit: 1`,
   language: 'fitch',
   theme: 'vs-dark',
   lineNumbers: false,
@@ -20,10 +18,8 @@ hello();`,
 
 
 export function process_user_input() {
-  console.log("processing")
   replace_words_by_fancy_symbols();
 
-  console.log(document.getElementById("proof-field").value);
   console.log(editor.getValue())
   let res = check_proof(editor.getValue(), document.getElementById("allowed-variable-names").value);
   if (res.startsWith("The proof is correct!")) {
@@ -39,7 +35,11 @@ export function process_user_input() {
 
 function format() {
   let formatted = format_proof(editor.getValue());
+
+  let selection = editor.getSelection()
+
   editor.setValue(formatted)
+  editor.setSelection(selection)
   // document.getElementById("proof-field").value = formatted;
   process_user_input();
 }
@@ -109,6 +109,8 @@ function replace_words_by_fancy_symbols() {
     offset = 1;
   } else if (proofstr.includes("not")) {
     offset = 2;
+  } else if (proofstr.includes("neg")) {
+    offset = 2;
   } else if (proofstr.includes("impl")) {
     offset = 3;
   } else if (proofstr.includes("bic")) {
@@ -125,13 +127,11 @@ function replace_words_by_fancy_symbols() {
     return;
   }
 
-  proofstr = proofstr.replace("fa", "∀").replace("ex", "∃").replace("not", "¬").replace("or", "∨")
+  proofstr = proofstr.replace("fa", "∀").replace("ex", "∃").replace("not", "¬").replace("neg", "¬").replace("or", "∨")
     .replace("bot", "⊥").replace("bic", "↔").replace("impl", "→").replace("and", "∧");
-  let oldSelectionIndex = document.getElementById("proof-field").selectionStart;
-  // document.getElementById("proof-field").value = proofstr;
+  let oldSelectionIndex = editor.getSelection()
   editor.setValue(proofstr)
-  document.getElementById("proof-field").focus();
-  document.getElementById("proof-field").setSelectionRange(oldSelectionIndex - offset, oldSelectionIndex - offset);
+  editor.setSelection(oldSelectionIndex)
 };
 
 // Download proof as .txt file
