@@ -1,5 +1,13 @@
 # What is this?
 
+This is a fork of the real thing.
+Available at: https://code-for-groningen.github.io/BetterVIZIER/
+
+Changes so far:
+- Ctrl + S to format
+- Actual dark mode
+- More sensible template
+
 This is a formal proof validator, which determines the correctness of Fitch-style natural deduction proofs ("Fitch proofs").
 
 The tool was developed by Aron Hardeman and used by students who follow the course Introduction to Logic (for CS) at the University of Groningen (the Netherlands).
