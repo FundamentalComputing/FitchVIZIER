@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "devDependencies": {
+    "monaco-editor": "^0.53.0",
     "typescript": "~5.8.3",
     "vite": "^7.1.2"
   },
