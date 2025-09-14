@@ -36,14 +36,14 @@ jobs:
       - name: Install WASM-pack
         run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
       - name: Build to WASM
-        run: wasm-pack build --release --target web fitch-proof
+        run: pnpm install && pnpm build
       - name: Setup Pages
         uses: actions/configure-pages@v5
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
           # Upload only this directory (recursively)
-          path: './fitch-proof'
+          path: './fitch-proof/packages/app/dist'
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
