@@ -1,0 +1,16 @@
+{
+  "name": "pnpm-workspace",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "build": "pnpm run build:wasm && pnpm run build:library && pnpm run build:app",
+    "build:wasm": "wasm-pack build  --out-dir packages/library/wasm --out-name index --target web",
+    "build:library": "pnpm --filter library run build",
+    "build:app": "pnpm --filter app run build",
+    "start": "pnpm --filter app run start"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}
