@@ -31,19 +31,30 @@ textarea:disabled {
 
 .important-box {
   border: 3px solid black;
-  color: black;
+  color: white;
   font-size: 20px;
   margin: 2mm;
-  background-color: white;
+  background-color: #232323;
   display: inline-block;
   padding: 4mm;
   border-radius: 12px;
 }
 
 button {
-  padding: 9px 9px;
+  padding: 4px;
+  margin: 0px;
+  background: #232323;
+  border-radius: 4px;
+  border: 0px;
+  color: white;
+  cursor: pointer;
 }
 
 code {
   background-color: gray;
+}
+
+#proof-field{
+  background: #232323;
+  color: white;
 }

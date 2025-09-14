@@ -1,226 +1,232 @@
 <html>
 
 <head>
-   <meta content="text/html;charset=utf-8" http-equiv="Content-Type" />
-   <link rel="stylesheet" type="text/css" href="style.css" />
-   <script type="text/javascript" src="examples.js"></script>
-   <title>FitchVIZIER</title>
+  <meta content="text/html;charset=utf-8" http-equiv="Content-Type" />
+  <link rel="stylesheet" type="text/css" href="style.css" />
+  <script type="text/javascript" src="examples.js"></script>
+  <title>FitchVIZIER</title>
 </head>
 
 <body>
-   <p><strong style="font-size:50px;color:white;">Fitch<em>VIZIER</em></strong></p>
+  <p><strong style="font-size:50px;color:white;">Fitch<em>VIZIER</em></strong></p>
 
-   <script type="module">
-      import init, { check_proof, format_proof, fix_line_numbers_in_proof, export_to_latex } from './pkg/fitch_proof.js';
+  <script type="module">
+    import init, {check_proof, format_proof, fix_line_numbers_in_proof, export_to_latex} from './pkg/fitch_proof.js';
 
 
-      export function process_user_input() {
-         replace_words_by_fancy_symbols();
+    export function process_user_input() {
+      replace_words_by_fancy_symbols();
 
-         console.log(document.getElementById("proof-field").value);
-         let res = check_proof(document.getElementById("proof-field").value, document.getElementById("allowed-variable-names").value);
-         if (res.startsWith("The proof is correct!")) {
-            document.getElementById("feedback").style.color = "green";
-         } else if (res.startsWith("Fatal error")) {
-            document.getElementById("feedback").style.color = "red";
-         } else {
-            document.getElementById("feedback").style.color = "#f05a1f";
-         }
-         document.getElementById("feedback").innerText = res;
-         console.log(res);
+      console.log(document.getElementById("proof-field").value);
+      let res = check_proof(document.getElementById("proof-field").value, document.getElementById("allowed-variable-names").value);
+      if (res.startsWith("The proof is correct!")) {
+        document.getElementById("feedback").style.color = "green";
+      } else if (res.startsWith("Fatal error")) {
+        document.getElementById("feedback").style.color = "red";
+      } else {
+        document.getElementById("feedback").style.color = "#f05a1f";
       }
+      document.getElementById("feedback").innerText = res;
+      console.log(res);
+    }
 
-      function format() {
-         let formatted = format_proof(document.getElementById("proof-field").value);
-         document.getElementById("proof-field").value = formatted;
-         process_user_input();
-      }
-
-      function fix_line_numbers() {
-         let fixed = fix_line_numbers_in_proof(document.getElementById("proof-field").value);
-         document.getElementById("proof-field").value = fixed;
-         process_user_input();
-      }
-
-      function to_latex() {
-         let latex = export_to_latex(document.getElementById("proof-field").value);
-         sessionStorage.setItem("latex-exported-proof", latex);
-         window.open("latex_export.html", "_blank");
-      }
-
-      let advanced_settings_are_visible = false;
-      function toggle_show_advanced_settings() {
-         advanced_settings_are_visible = !advanced_settings_are_visible;
-         document.getElementById("advanced-settings").hidden = !advanced_settings_are_visible;
-      };
-
-      let examples_are_visible = false;
-      function show_examples() {
-         examples_are_visible = !examples_are_visible;
-         document.getElementById("additional-examples").hidden = !examples_are_visible;
-      }
-      export function load_example(ex) {
-         let rdy = document.getElementById('proof-field').value == "";
-         if (!rdy) {
-            rdy = confirm("Your proof area is not empty. Loading an example will overwrite your current proof. Are you sure you want to continue?");
-         }
-         if (rdy) {
-            console.log(ex);
-            document.getElementById('proof-field').value = ex;
-            process_user_input();
-         }
-      }
-      window.load_example = load_example;
-
-      let proof_is_upside_down = false;
-      function upside_down() {
-         proof_is_upside_down = !proof_is_upside_down;
-         if (proof_is_upside_down) {
-            document.getElementById("proof-field").style.setProperty("-webkit-transform", "rotate(180deg)", null);
-         } else {
-            document.getElementById("proof-field").style.setProperty("-webkit-transform", "rotate(0deg)", null);
-         }
-      }
-
-      document.addEventListener('keydown', function (event) {
-         if (event.altKey && event.key === 's') {
-            toggle_show_advanced_settings();
-         }
-      });
-
-
-      // when user types e.g. 'forall', replace it instantly with the proper forall unicode symbol, and 
-      // keep the user's cursor at the correct position so that user can continue typing.
-      function replace_words_by_fancy_symbols() {
-         let proofstr = document.getElementById("proof-field").value;
-         let offset = -1;
-         if (proofstr.includes("fa")) {
-            offset = 1;
-         } else if (proofstr.includes("ex")) {
-            offset = 1;
-         } else if (proofstr.includes("not")) {
-            offset = 2;
-         } else if (proofstr.includes("impl")) {
-            offset = 3;
-         } else if (proofstr.includes("bic")) {
-            offset = 2;
-         } else if (proofstr.includes("and")) {
-            offset = 2;
-         } else if (proofstr.includes("or")) {
-            offset = 1;
-         } else if (proofstr.includes("bot")) {
-            offset = 2;
-         }
-
-         if (offset == -1) {
-            return;
-         }
-
-         proofstr = proofstr.replace("fa", "∀").replace("ex", "∃").replace("not", "¬").replace("or", "∨")
-            .replace("bot", "⊥").replace("bic", "↔").replace("impl", "→").replace("and", "∧");
-         let oldSelectionIndex = document.getElementById("proof-field").selectionStart;
-         document.getElementById("proof-field").value = proofstr;
-         document.getElementById("proof-field").focus();
-         document.getElementById("proof-field").setSelectionRange(oldSelectionIndex - offset, oldSelectionIndex - offset);
-      };
-      
-      // Download proof as .txt file
-      function download_proof() {
-         const element = document.createElement('a');
-         const blob = new Blob([document.getElementById('proof-field').value], { type: 'plain/text' });
-         const fileUrl = URL.createObjectURL(blob);
-         element.setAttribute("href", fileUrl);
-         element.setAttribute("download", "proof.txt"); 
-         element.style.display = 'none';
-         document.body.appendChild(element);
-         element.click();
-         document.body.removeChild(element);
-      };
-
-      document.getElementById("proof-field").onkeyup = process_user_input;
-      document.getElementById("format-button").onclick = format;
-      document.getElementById("latex-button").onclick = to_latex;
-      document.getElementById("load-example-button").onclick = show_examples;
-      document.getElementById("download-button").onclick = download_proof;
-      document.getElementById("upside-down-button").onclick = upside_down;
-      document.getElementById("fix-line-numbers-button").onclick = fix_line_numbers;
-      document.getElementById("settings-button").onclick = toggle_show_advanced_settings;
-      document.getElementById("allowed-variable-names").onkeyup = process_user_input;
-      await init();
+    function format() {
+      let formatted = format_proof(document.getElementById("proof-field").value);
+      document.getElementById("proof-field").value = formatted;
       process_user_input();
+    }
+
+    function fix_line_numbers() {
+      let fixed = fix_line_numbers_in_proof(document.getElementById("proof-field").value);
+      document.getElementById("proof-field").value = fixed;
+      process_user_input();
+    }
+
+    function to_latex() {
+      let latex = export_to_latex(document.getElementById("proof-field").value);
+      sessionStorage.setItem("latex-exported-proof", latex);
+      window.open("latex_export.html", "_blank");
+    }
+
+    let advanced_settings_are_visible = false;
+    function toggle_show_advanced_settings() {
+      advanced_settings_are_visible = !advanced_settings_are_visible;
+      document.getElementById("advanced-settings").hidden = !advanced_settings_are_visible;
+    };
+
+    let examples_are_visible = false;
+    function show_examples() {
+      examples_are_visible = !examples_are_visible;
+      document.getElementById("additional-examples").hidden = !examples_are_visible;
+    }
+    export function load_example(ex) {
+      let rdy = document.getElementById('proof-field').value == "";
+      if (!rdy) {
+        rdy = confirm("Your proof area is not empty. Loading an example will overwrite your current proof. Are you sure you want to continue?");
+      }
+      if (rdy) {
+        console.log(ex);
+        document.getElementById('proof-field').value = ex;
+        process_user_input();
+      }
+    }
+    window.load_example = load_example;
+
+    let proof_is_upside_down = false;
+    function upside_down() {
+      proof_is_upside_down = !proof_is_upside_down;
+      if (proof_is_upside_down) {
+        document.getElementById("proof-field").style.setProperty("-webkit-transform", "rotate(180deg)", null);
+      } else {
+        document.getElementById("proof-field").style.setProperty("-webkit-transform", "rotate(0deg)", null);
+      }
+    }
+
+    document.addEventListener('keydown', function (event) {
+      if (event.altKey && event.key === 's') {
+        toggle_show_advanced_settings();
+      }
+    });
+
+
+    // when user types e.g. 'forall', replace it instantly with the proper forall unicode symbol, and 
+    // keep the user's cursor at the correct position so that user can continue typing.
+    function replace_words_by_fancy_symbols() {
+      let proofstr = document.getElementById("proof-field").value;
+      let offset = -1;
+      if (proofstr.includes("fa")) {
+        offset = 1;
+      } else if (proofstr.includes("ex")) {
+        offset = 1;
+      } else if (proofstr.includes("not")) {
+        offset = 2;
+      } else if (proofstr.includes("impl")) {
+        offset = 3;
+      } else if (proofstr.includes("bic")) {
+        offset = 2;
+      } else if (proofstr.includes("and")) {
+        offset = 2;
+      } else if (proofstr.includes("or")) {
+        offset = 1;
+      } else if (proofstr.includes("bot")) {
+        offset = 2;
+      }
+
+      if (offset == -1) {
+        return;
+      }
+
+      proofstr = proofstr.replace("fa", "∀").replace("ex", "∃").replace("not", "¬").replace("or", "∨")
+        .replace("bot", "⊥").replace("bic", "↔").replace("impl", "→").replace("and", "∧");
+      let oldSelectionIndex = document.getElementById("proof-field").selectionStart;
+      document.getElementById("proof-field").value = proofstr;
+      document.getElementById("proof-field").focus();
+      document.getElementById("proof-field").setSelectionRange(oldSelectionIndex - offset, oldSelectionIndex - offset);
+    };
+
+    // Download proof as .txt file
+    function download_proof() {
+      const element = document.createElement('a');
+      const blob = new Blob([document.getElementById('proof-field').value], {type: 'plain/text'});
+      const fileUrl = URL.createObjectURL(blob);
+      element.setAttribute("href", fileUrl);
+      element.setAttribute("download", "proof.txt");
+      element.style.display = 'none';
+      document.body.appendChild(element);
+      element.click();
+      document.body.removeChild(element);
+    };
+
+    document.getElementById("proof-field").onkeyup = process_user_input;
+    document.getElementById("format-button").onclick = format;
+    document.getElementById("latex-button").onclick = to_latex;
+    document.getElementById("load-example-button").onclick = show_examples;
+    document.getElementById("download-button").onclick = download_proof;
+    document.getElementById("upside-down-button").onclick = upside_down;
+    document.getElementById("fix-line-numbers-button").onclick = fix_line_numbers;
+    document.getElementById("settings-button").onclick = toggle_show_advanced_settings;
+    document.getElementById("allowed-variable-names").onkeyup = process_user_input;
+
+    document.addEventListener('keydown', function (event) {
+      if (event.ctrlKey && event.key === 's') {
+        event.preventDefault(); // Prevent default save action
+        format()
+      }
+    });
+    await init();
+    process_user_input();
 
 
 
 
-   </script>
-   <textarea spellcheck="false" rows=30 cols=90 id="proof-field">
-1 | ∀x (H(x) → M(x))
-2 | H(socrates)
+  </script>
+  <!-- beautify ignore:start -->
+  <textarea spellcheck="false" rows=30 cols=90 id="proof-field">
+1 | A
   |----
-3 | H(socrates) → M(socrates)         ∀ Elim: 1
-4 | M(socrates)                       → Elim: 3,2
-</textarea><br>
+2 | A           Reit: 1</textarea><br>
+<!-- beautify ignore:end -->
 
-   <br>
-   <div id="feedback" class="important-box" style="font-weight:bold">
-   </div>
-   <br>
-   <div class="important-box">
-      Typing guide:
-      <span style="color:red">∧</span>:<span style=color:blue>and</span>
-      <span style="color:red">∨</span>:<span style=color:blue>or</span>
-      <span style="color:red">¬</span>:<span style=color:blue>not</span>
-      <span style="color:red">→</span>:<span style=color:blue>impl</span>
-      <span style="color:red">↔</span>:<span style=color:blue>bic</span>
-      <span style="color:red">⊥</span>:<span style=color:blue>bot</span>
-      <span style="color:red">∀</span>:<span style=color:blue>fa</span>
-      <span style="color:red">∃</span>:<span style=color:blue>ex</span>
-   </div>
+  <br>
+  <div id="feedback" class="important-box" style="font-weight:bold">
+  </div>
+  <br>
+  <div class="important-box">
+    Typing guide:
+    <span style="color:red">∧</span>:<span style=color:lightblue>and</span>
+    <span style="color:red">∨</span>:<span style=color:lightblue>or</span>
+    <span style="color:red">¬</span>:<span style=color:lightblue>not</span>
+    <span style="color:red">→</span>:<span style=color:lightblue>impl</span>
+    <span style="color:red">↔</span>:<span style=color:lightblue>bic</span>
+    <span style="color:red">⊥</span>:<span style=color:lightblue>bot</span>
+    <span style="color:red">∀</span>:<span style=color:lightblue>fa</span>
+    <span style="color:red">∃</span>:<span style=color:lightblue>ex</span>
+  </div>
 
-   <br>
-   <br>
+  <br>
+  <br>
 
-   <button id="latex-button" title="Export proof to LaTeX">EXPORT TO LATEX</button>
-   <button id="format-button" title="Make your proof more beautiful!">FORMAT PROOF</button>
-   <button id="fix-line-numbers-button"
-      title="Fix the line numbers in a proof, and automatically update justifications. For example, suppose you want to delete a line in the middle of your proof. In that case, you can just delete that line and press this button afterwards, which will fix up the line numbers. If you want to insert a line in the middle of your proof, just initially give it a line number of 100 or so, and click this button afterwards.">FIX
-      LINE NUMBERS</button>
-   <button id="load-example-button" title="Load example proofs">SHOW EXAMPLES</button>
-   <button id="download-button" title="Download this proof as a .txt file">DOWNLOAD</button>
-   <button id="settings-button" title="Toggle visibility of advanced settings">ADVANCED SETTINGS</button>
-   <br>
-   <br>
-   <div id="additional-examples"
-      style="padding-top:10px;background-color: white;border: 3px solid black;border-radius: 10px;color:black; max-width: 100ch; margin-bottom: 1em; margin-left: auto; margin-right: auto; "
-      hidden>
-      <strong>Example proofs</strong>
-      <ul>
-         <li><a href="javascript:load_example(ex1);">A ∧ B ⊢ B ∧ A</a></li>
-         <li><a href="javascript:load_example(ex2);">P(a) ∧ P(b), a=c ∨ b=c ⊢ P(c)</a></li>
-         <li><a href="javascript:load_example(ex3);">∀x∃y R(x,y) → ∃y∀x R(x,y) ⊢ ∃x(∀y ¬R(x,y) ∨ ∀y R(y,x))</a></li>
-      </ul>
-   </div>
-   <div id="advanced-settings"
-      style="padding-top:10px;background-color: white;border: 3px solid black;border-radius: 10px;color:black; max-width: 100ch; margin-left: auto; margin-right: auto; "
-      hidden>
-      <strong>Advanced Settings (do not change unless you really have a good reason)</strong>
-      <br>
-      <br>
-      <p>List of strings that should be recognized as variables (separated by commas): <input
-            id="allowed-variable-names" value="x,y,z,u,v,w" /><br>
-         <em>(For example, using the default settings, having ∀x P(x) is allowed, but having ∀a P(a) is not, because a
-            is
-            not used for variables. With this setting, you can change which strings should be seen as a variable. All
-            other
-            strings that start with a lowercase letter will be seen as a constant or function symbol, depending on the
-            context in which they are found.)</em>
-      </p>
-      <br />
-      <p>Rotate the proof by 180 degrees: <button id="upside-down-button" title="Rotate proof...">ROTATE
-            PROOF...</button></p>
-   </div>
+  <button id="latex-button" title="Export proof to LaTeX">EXPORT TO LATEX</button>
+  <button id="format-button" title="Make your proof more beautiful!">FORMAT PROOF</button>
+  <button id="fix-line-numbers-button"
+    title="Fix the line numbers in a proof, and automatically update justifications. For example, suppose you want to delete a line in the middle of your proof. In that case, you can just delete that line and press this button afterwards, which will fix up the line numbers. If you want to insert a line in the middle of your proof, just initially give it a line number of 100 or so, and click this button afterwards.">FIX
+    LINE NUMBERS</button>
+  <button id="load-example-button" title="Load example proofs">SHOW EXAMPLES</button>
+  <button id="download-button" title="Download this proof as a .txt file">DOWNLOAD</button>
+  <button id="settings-button" title="Toggle visibility of advanced settings">ADVANCED SETTINGS</button>
+  <br>
+  <br>
+  <div id="additional-examples"
+    style="padding-top:10px;background-color: white;border: 3px solid black;border-radius: 10px;color:black; max-width: 100ch; margin-bottom: 1em; margin-left: auto; margin-right: auto; "
+    hidden>
+    <strong>Example proofs</strong>
+    <ul>
+      <li><a href="javascript:load_example(ex1);">A ∧ B ⊢ B ∧ A</a></li>
+      <li><a href="javascript:load_example(ex2);">P(a) ∧ P(b), a=c ∨ b=c ⊢ P(c)</a></li>
+      <li><a href="javascript:load_example(ex3);">∀x∃y R(x,y) → ∃y∀x R(x,y) ⊢ ∃x(∀y ¬R(x,y) ∨ ∀y R(y,x))</a></li>
+    </ul>
+  </div>
+  <div id="advanced-settings"
+    style="padding-top:10px;background-color: white;border: 3px solid black;border-radius: 10px;color:black; max-width: 100ch; margin-left: auto; margin-right: auto; "
+    hidden>
+    <strong>Advanced Settings (do not change unless you really have a good reason)</strong>
+    <br>
+    <br>
+    <p>List of strings that should be recognized as variables (separated by commas): <input id="allowed-variable-names"
+        value="x,y,z,u,v,w" /><br>
+      <em>(For example, using the default settings, having ∀x P(x) is allowed, but having ∀a P(a) is not, because a
+        is
+        not used for variables. With this setting, you can change which strings should be seen as a variable. All
+        other
+        strings that start with a lowercase letter will be seen as a constant or function symbol, depending on the
+        context in which they are found.)</em>
+    </p>
+    <br />
+    <p>Rotate the proof by 180 degrees: <button id="upside-down-button" title="Rotate proof...">ROTATE
+        PROOF...</button></p>
+  </div>
 
-   <p><a href="https://github.com/FundamentalComputing/FitchVIZIER/">Source code</a></p>
+  <p>Fork by Hailey | <a href="https://github.com/FundamentalComputing/FitchVIZIER/">Original Source code</a></p>
 </body>
 
 </html>
