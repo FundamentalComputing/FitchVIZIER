@@ -4,7 +4,7 @@ import './style.css'
 // @ts-ignore
 import { init, check_proof, format_proof, fix_line_numbers_in_proof, export_to_latex } from '@workspace/library'
 import * as monaco from 'monaco-editor';
-import MonacoErrorLens from '@ym-han/monaco-error-lens';
+import MonacoErrorLens, { type MonacoEditor } from '@ym-han/monaco-error-lens';
 
 monaco.languages.register({
   id: 'fitch',
@@ -120,6 +120,7 @@ const editor = monaco.editor.create(document.getElementById('editor'), {
     invisibleCharacters: true
   }
 });
+window.editor = editor
 
 
 editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, function() {
@@ -136,6 +137,10 @@ editor.addCommand(monaco.KeyCode.Tab, function() {
 
 editor.addCommand(monaco.KeyMod.Shift | monaco.KeyCode.Tab, function() {
   removePipe(editor);
+});
+
+editor.addCommand(monaco.KeyCode.Enter, function() {
+  insertNewline(editor);
 });
 
 function insertPipe(editor) {
@@ -211,6 +216,34 @@ function removePipe(editor) {
 
 
 
+function insertNewline(editor: monaco.editor.IStandaloneCodeEditor) {
+  const selection = editor.getSelection();
+  const model = editor.getModel();
+
+  if (selection.isEmpty()) {
+    // Single cursor - insert pipe at cursor position
+    const pos = editor.getPosition();
+    const lineNumber = findNumberedLineUp(pos.lineNumber)
+    const line = model.getValue().split("\n")[pos.lineNumber - 1]
+    const depth = line ? line.split("|").length - 1 : 1
+    console.log("dsads", lineNumber)
+
+    editor.executeEdits('insert-after-newline', [{
+      range: new monaco.Range(
+        pos.lineNumber,
+        999 | pos.column,
+        pos.lineNumber,
+        999 | pos.column
+      ),
+      text: `\n${lineNumber + 1} ${"| ".repeat(depth)}`
+    }]);
+
+
+  } else {
+    console.log("selection not implemented")
+  }
+}
+
 
 
 // Create Error Lens instance
@@ -281,7 +314,11 @@ function format() {
   let selection = editor.getSelection()
   let pos = editor.getPosition()
 
-  editor.setValue(formatted)
+
+  editor.executeEdits('format-source', [{
+    range: editor.getModel().getFullModelRange(),
+    text: formatted
+  }]);
   // selection.
   editor.setSelection(selection)
   // Move to end of current line
@@ -295,8 +332,11 @@ function format() {
 
 function fix_line_numbers() {
   let fixed = fix_line_numbers_in_proof(editor.getValue());
-  editor.setValue(fixed)
-  // document.getElementById("proof-field").value = fixed;
+
+  editor.executeEdits('format-source', [{
+    range: editor.getModel().getFullModelRange(),
+    text: fixed
+  }]);
   process_user_input();
 }
 
@@ -373,9 +413,21 @@ function replace_words_by_fancy_symbols() {
 
   proofstr = proofstr.replace("fa", "∀").replace("ex", "∃").replace("not", "¬").replace("neg", "¬").replace("or", "∨")
     .replace("bot", "⊥").replace("bic", "↔").replace("impl", "→").replace("and", "∧");
-  let oldSelectionIndex = editor.getSelection()
-  editor.setValue(proofstr)
-  editor.setSelection(oldSelectionIndex)
+  // let oldSelectionIndex = editor.getSelection()
+  let pos = editor.getPosition()
+  // editor.executeEdits(new monaco.Range(1, 1, 1, 1), proofstr)
+
+
+  editor.executeEdits('format-source', [{
+    range: editor.getModel().getFullModelRange(),
+    text: proofstr
+  }]);
+
+  pos.column -= offset - 1
+  setTimeout(() => {
+    editor.setPosition(pos)
+  }, 1)
+  // editor.executeEdits
 };
 
 // Download proof as .txt file
@@ -408,32 +460,9 @@ model.onDidChangeContent((event) => {
   process_user_input()
 
   // Check if the change includes a new line
-  event.changes.forEach(change => {
-    console.log("change", change.text.length, change.text.includes("\n"))
-    if (change.text.includes('\n') && change.text.length < 10) {
-      // A new line was inserted
-      const position = editor.getPosition();
-
-      // Insert something after the new line
-      setTimeout(() => {
-        const currentPosition = editor.getPosition();
-        const lineNumber = findNumberedLineUp(currentPosition.lineNumber - 1)
-        const line = model.getValue().split("\n")[currentPosition.lineNumber - 2]
-        const depth = line.split("|").length
-        console.log("dsads", lineNumber)
-
-        editor.executeEdits('insert-after-newline', [{
-          range: new monaco.Range(
-            currentPosition.lineNumber,
-            currentPosition.column,
-            currentPosition.lineNumber,
-            currentPosition.column
-          ),
-          text: `${lineNumber + 1} ${Array.from(Array(depth)).join("| ")}`
-        }]);
-      }, 0);
-    }
-  });
+  // event.changes.forEach(change => {
+  //   console.log("change", change.text.length, change.text.includes("\n"))
+  // });
 });
 
 document.getElementById("format-button").onclick = format;
