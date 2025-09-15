@@ -192,9 +192,16 @@ function format() {
   let formatted = format_proof(editor.getValue());
 
   let selection = editor.getSelection()
+  let pos = editor.getPosition()
 
   editor.setValue(formatted)
+  // selection.
   editor.setSelection(selection)
+  // Move to end of current line
+  editor.setPosition({
+    lineNumber: pos.lineNumber,
+    column: editor.getModel().getLineMaxColumn(pos.lineNumber)
+  });
   // document.getElementById("proof-field").value = formatted;
   process_user_input();
 }
