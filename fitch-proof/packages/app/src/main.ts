@@ -305,8 +305,33 @@ function download_proof() {
 
 
 // Listen to content changes (fires on every keystroke)
-model.onDidChangeContent(() => {
+model.onDidChangeContent((event) => {
   process_user_input()
+
+  // Check if the change includes a new line
+  event.changes.forEach(change => {
+    if (change.text.includes('\n')) {
+      // A new line was inserted
+      const position = editor.getPosition();
+      if (position.lineNumber == 1) return
+
+      // Insert something after the new line
+      setTimeout(() => {
+        const currentPosition = editor.getPosition();
+        const line = model.getValue().split("\n")[currentPosition.lineNumber - 2]
+        const lineNumber = parseInt(line.split("|")[0])
+        editor.executeEdits('insert-after-newline', [{
+          range: new monaco.Range(
+            currentPosition.lineNumber,
+            currentPosition.column,
+            currentPosition.lineNumber,
+            currentPosition.column
+          ),
+          text: `${lineNumber + 1} | `
+        }]);
+      }, 0);
+    }
+  });
 });
 
 document.getElementById("format-button").onclick = format;
