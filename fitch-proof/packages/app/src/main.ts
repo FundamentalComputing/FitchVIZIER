@@ -79,8 +79,8 @@ monaco.editor.defineTheme('fitch-theme', {
     { token: 'operator.biconditional', foreground: 'CC6666', fontStyle: 'bold' },
     { token: 'operator.falsum', foreground: 'FF4444', fontStyle: 'bold' },
     { token: 'operator.verum', foreground: '44FF44', fontStyle: 'bold' },
-    { token: 'operator.equality', foreground: '66CCCC', fontStyle: 'bold' },
-    { token: 'operator.inequality', foreground: '66CCCC', fontStyle: 'bold' },
+    { token: 'operator.equality', foreground: 'CC6666', fontStyle: 'bold' },
+    { token: 'operator.inequality', foreground: 'CC6666', fontStyle: 'bold' },
     { token: 'quantifier.universal', foreground: '9966CC', fontStyle: 'bold' },
     { token: 'quantifier.existential', foreground: '9966CC', fontStyle: 'bold' },
     { token: 'predicate', foreground: '99CC99' },
@@ -88,7 +88,7 @@ monaco.editor.defineTheme('fitch-theme', {
     { token: 'variable', foreground: '99CCFF' },
     { token: 'rule-name', foreground: 'FF9966', fontStyle: 'italic' },
     { token: 'justification.reference', foreground: 'CCCCCC' },
-    { token: 'delimiter', foreground: 'FFFFFF' }
+    { token: 'delimiter', foreground: '#87875f' }
   ],
   colors: {
     'editor.background': '#1e1e1e'
