@@ -8,7 +8,7 @@ import MonacoErrorLens from '@ym-han/monaco-error-lens';
 
 monaco.languages.register({
   id: 'fitch',
-  extensions: ['.fitch'],
+  extensions: ['.fitch', '.txt'],
   aliases: ['Fitch Proof', 'fitch'],
   mimetypes: ['text/fitch']
 });
@@ -125,6 +125,93 @@ const editor = monaco.editor.create(document.getElementById('editor'), {
 editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, function() {
   format()
 });
+
+
+// VIBE CODE SECTION
+
+// Add custom key bindings
+editor.addCommand(monaco.KeyCode.Tab, function() {
+  insertPipe(editor);
+});
+
+editor.addCommand(monaco.KeyMod.Shift | monaco.KeyCode.Tab, function() {
+  removePipe(editor);
+});
+
+function insertPipe(editor) {
+  const selection = editor.getSelection();
+  const model = editor.getModel();
+
+  if (selection.isEmpty()) {
+    // Single cursor - insert pipe at cursor position
+    const position = editor.getPosition();
+    editor.executeEdits('insert-pipe', [{
+      range: new monaco.Range(
+        position.lineNumber, position.column,
+        position.lineNumber, position.column
+      ),
+      text: '| '
+    }]);
+  } else {
+    // Multi-line selection - add pipe at start of each line
+    const startLine = selection.startLineNumber;
+    const endLine = selection.endLineNumber;
+    const edits = [];
+
+    for (let lineNumber = startLine; lineNumber <= endLine; lineNumber++) {
+      edits.push({
+        range: new monaco.Range(lineNumber, 1, lineNumber, 1),
+        text: '| '
+      });
+    }
+
+    editor.executeEdits('insert-pipe-multiline', edits);
+  }
+}
+
+function removePipe(editor) {
+  const selection = editor.getSelection();
+  const model = editor.getModel();
+
+  if (selection.isEmpty()) {
+    // Single cursor - remove pipe before cursor if it exists
+    const position = editor.getPosition();
+    const lineContent = model.getLineContent(position.lineNumber);
+
+    if (position.column > 1 && lineContent.charAt(position.column - 2) === '|') {
+      editor.executeEdits('remove-pipe', [{
+        range: new monaco.Range(
+          position.lineNumber, position.column - 1,
+          position.lineNumber, position.column
+        ),
+        text: ''
+      }]);
+    }
+  } else {
+    // Multi-line selection - remove pipe from start of each line
+    const startLine = selection.startLineNumber;
+    const endLine = selection.endLineNumber;
+    const edits = [];
+
+    for (let lineNumber = startLine; lineNumber <= endLine; lineNumber++) {
+      const lineContent = model.getLineContent(lineNumber);
+      if (lineContent.startsWith('|')) {
+        edits.push({
+          range: new monaco.Range(lineNumber, 1, lineNumber, 2),
+          text: ''
+        });
+      }
+    }
+
+    if (edits.length > 0) {
+      editor.executeEdits('remove-pipe-multiline', edits);
+    }
+  }
+}
+
+
+
+
 
 // Create Error Lens instance
 const errorLens = new MonacoErrorLens(editor, monaco, {
@@ -322,18 +409,18 @@ model.onDidChangeContent((event) => {
 
   // Check if the change includes a new line
   event.changes.forEach(change => {
-    if (change.text.includes('\n') && change.text.length < 3) {
+    console.log("change", change.text.length, change.text.includes("\n"))
+    if (change.text.includes('\n') && change.text.length < 10) {
       // A new line was inserted
       const position = editor.getPosition();
 
       // Insert something after the new line
       setTimeout(() => {
         const currentPosition = editor.getPosition();
-        // const line = model.getValue().split("\n")[currentPosition.lineNumber - 2]
-        // const lineNumber = parseInt(line.split("|")[0])
         const lineNumber = findNumberedLineUp(currentPosition.lineNumber - 1)
         const line = model.getValue().split("\n")[currentPosition.lineNumber - 2]
         const depth = line.split("|").length
+        console.log("dsads", lineNumber)
 
         editor.executeEdits('insert-after-newline', [{
           range: new monaco.Range(
