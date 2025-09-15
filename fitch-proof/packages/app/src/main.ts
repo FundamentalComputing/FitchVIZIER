@@ -95,10 +95,17 @@ monaco.editor.defineTheme('fitch-theme', {
   }
 });
 
-const editor = monaco.editor.create(document.getElementById('editor'), {
-  value: `1 | A
+const value = `1 | A
   |----
-2 | A           Reit: 1`,
+2 | A           Reit: 1`;
+const uri = monaco.Uri.parse("inmemory://test");
+const model = monaco.editor.createModel(value, "fitch", uri);
+
+const editor = monaco.editor.create(document.getElementById('editor'), {
+  //   value: `1 | A
+  //   |----
+  // 2 | A           Reit: 1`,
+  model,
   language: 'fitch',
   theme: 'fitch-theme',
   lineNumbers: false,
@@ -111,13 +118,14 @@ const editor = monaco.editor.create(document.getElementById('editor'), {
   }
 });
 
-window.editor = editor
 
 editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, function() {
   format()
 });
 
-
+function getEditorLineNumber(fitchLine: number) {
+  return editor.getValue().split("\n").findIndex(l => l.startsWith(fitchLine.toString())) + 1
+}
 
 export function process_user_input() {
   replace_words_by_fancy_symbols();
@@ -132,7 +140,26 @@ export function process_user_input() {
     document.getElementById("feedback").style.color = "#f05a1f";
   }
   document.getElementById("feedback").innerText = res;
-  console.log(res);
+  const regex = /(?:line\s+)(\d+)/;
+  const matches = regex.exec(res);
+  if (matches) {
+    const editorLine = getEditorLineNumber(Number(matches[1]))
+    console.log(res, matches[1], editorLine);
+    const markers: monaco.editor.IMarkerData[] = [
+      {
+        message: res,
+        severity: monaco.MarkerSeverity.Error,
+        startLineNumber: editorLine,
+        startColumn: 0,
+        endLineNumber: editorLine,
+        endColumn: 999,
+      }
+    ]
+    monaco.editor.setModelMarkers(model, "owner", markers);
+    // editor.setModelMarkers()
+  } else {
+    monaco.editor.setModelMarkers(model, "owner", [])
+  }
 }
 
 function format() {
@@ -193,13 +220,6 @@ function upside_down() {
   }
 }
 
-// document.addEventListener('keydown', function(event) {
-//   if (event.altKey && event.key === 's') {
-//     toggle_show_advanced_settings();
-//   }
-// });
-
-
 // when user types e.g. 'forall', replace it instantly with the proper forall unicode symbol, and 
 // keep the user's cursor at the correct position so that user can continue typing.
 function replace_words_by_fancy_symbols() {
@@ -250,7 +270,7 @@ function download_proof() {
 
 
 // Listen to content changes (fires on every keystroke)
-editor.onDidChangeModelContent(() => {
+model.onDidChangeContent(() => {
   process_user_input()
 });
 
@@ -263,13 +283,6 @@ document.getElementById("fix-line-numbers-button").onclick = fix_line_numbers;
 document.getElementById("allowed-variable-names").onkeyup = process_user_input;
 document.getElementById("settings-button").onclick = toggle_show_advanced_settings;
 
-// document.addEventListener('keydown', function(event) {
-//   if (event.ctrlKey && event.key === 's') {
-//     event.preventDefault(); // Prevent default save action
-//     format()
-//   }
-// });
-// format()
 
 
 
