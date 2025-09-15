@@ -14,6 +14,7 @@
     "vite": "^7.1.2"
   },
   "dependencies": {
+    "@fontsource-variable/fira-code": "^5.2.6",
     "@workspace/library": "workspace:*",
     "vite-plugin-wasm": "^3.5.0"
   }

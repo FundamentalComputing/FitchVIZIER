@@ -1,4 +1,5 @@
 // @ts-nocheck
+import '@fontsource-variable/fira-code';
 import './style.css'
 // @ts-ignore
 import { init, check_proof, format_proof, fix_line_numbers_in_proof, export_to_latex } from '@workspace/library'
@@ -101,7 +102,13 @@ const editor = monaco.editor.create(document.getElementById('editor'), {
   language: 'fitch',
   theme: 'fitch-theme',
   lineNumbers: false,
-  automaticLayout: true
+  automaticLayout: true,
+  fontFamily: 'Fira Code Variable',
+  fontLigatures: true,
+  unicodeHighlight: {
+    ambiguousCharacters: false,
+    invisibleCharacters: true
+  }
 });
 
 window.editor = editor
