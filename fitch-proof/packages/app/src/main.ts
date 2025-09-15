@@ -2,7 +2,7 @@
 import './style.css'
 // @ts-ignore
 import { init, check_proof, format_proof, fix_line_numbers_in_proof, export_to_latex } from '@workspace/library'
-import * as monaco from 'monaco-editor/esm/vs/editor/editor.api';
+import * as monaco from 'monaco-editor';
 
 monaco.languages.register({
   id: 'fitch',
@@ -95,8 +95,7 @@ monaco.editor.defineTheme('fitch-theme', {
 });
 
 const editor = monaco.editor.create(document.getElementById('editor'), {
-  value: `
-1 | A
+  value: `1 | A
   |----
 2 | A           Reit: 1`,
   language: 'fitch',
