@@ -140,7 +140,7 @@ export function process_user_input() {
     document.getElementById("feedback").style.color = "#f05a1f";
   }
   document.getElementById("feedback").innerText = res;
-  const regex = /(?:line\s+)(\d+)/;
+  const regex = /(?:Line\s+)(\d+)/;
   const matches = regex.exec(res);
   if (matches) {
     const editorLine = getEditorLineNumber(Number(matches[1]))
