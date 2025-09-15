@@ -10,6 +10,9 @@ importers:
 
   packages/app:
     dependencies:
+      '@fontsource-variable/fira-code':
+        specifier: ^5.2.6
+        version: 5.2.6
       '@workspace/library':
         specifier: workspace:*
         version: link:../library
@@ -196,6 +199,9 @@ packages:
     engines: {node: '>=18'}
     cpu: [x64]
     os: [win32]
+
+  '@fontsource-variable/fira-code@5.2.6':
+    resolution: {integrity: sha512-TZe+3xOB0JofZOTNeITYVsD1y/OiFucwTmcmhC19mj+GOgCnNkbp7bb1Jobfg+HjlAHr11HdptENKu0B+VkWLg==}
 
   '@rollup/rollup-android-arm-eabi@4.50.1':
     resolution: {integrity: sha512-HJXwzoZN4eYTdD8bVV22DN8gsPCAj3V20NHKOs8ezfXanGpmVPR7kalUHd+Y31IJp9stdB87VKPFbsGY3H/2ag==}
@@ -488,6 +494,8 @@ snapshots:
 
   '@esbuild/win32-x64@0.25.9':
     optional: true
+
+  '@fontsource-variable/fira-code@5.2.6': {}
 
   '@rollup/rollup-android-arm-eabi@4.50.1':
     optional: true
