@@ -16,6 +16,7 @@
   "dependencies": {
     "@fontsource-variable/fira-code": "^5.2.6",
     "@workspace/library": "workspace:*",
+    "@ym-han/monaco-error-lens": "^0.1.3",
     "vite-plugin-wasm": "^3.5.0"
   }
 }

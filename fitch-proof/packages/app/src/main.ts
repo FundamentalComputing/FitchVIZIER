@@ -4,6 +4,7 @@ import './style.css'
 // @ts-ignore
 import { init, check_proof, format_proof, fix_line_numbers_in_proof, export_to_latex } from '@workspace/library'
 import * as monaco from 'monaco-editor';
+import MonacoErrorLens from '@ym-han/monaco-error-lens';
 
 monaco.languages.register({
   id: 'fitch',
@@ -112,6 +113,8 @@ const editor = monaco.editor.create(document.getElementById('editor'), {
   automaticLayout: true,
   fontFamily: 'Fira Code Variable',
   fontLigatures: true,
+  glyphMargin: true,
+  minimap: { enabled: false },
   unicodeHighlight: {
     ambiguousCharacters: false,
     invisibleCharacters: true
@@ -122,6 +125,30 @@ const editor = monaco.editor.create(document.getElementById('editor'), {
 editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, function() {
   format()
 });
+
+// Create Error Lens instance
+const errorLens = new MonacoErrorLens(editor, monaco, {
+  enabled: false,
+  enableInlineMessages: true,
+  enableLineHighlights: true,
+  enableGutterIcons: true,
+  followCursor: 'allLines', // Only show diagnostics for current line
+  // messageTemplate: 'hi [{source}] {message}', // Custom message format
+  messageTemplate: 'hi',
+  maxMessageLength: 1000, // Truncate long messages
+  updateDelay: 200, // Debounce delay in ms
+  colors: {
+    error: {
+      background: 'rgba(255, 0, 0, 0.1)',
+      foreground: '#ff4444',
+    },
+    warning: {
+      background: 'rgba(255, 165, 0, 0.1)',
+      foreground: '#ff8800',
+    }
+  }
+});
+
 
 function getEditorLineNumber(fitchLine: number) {
   return editor.getValue().split("\n").findIndex(l => l.startsWith(fitchLine.toString())) + 1
@@ -140,8 +167,7 @@ export function process_user_input() {
     document.getElementById("feedback").style.color = "#f05a1f";
   }
   document.getElementById("feedback").innerText = res;
-  const regex = /(?:Line\s+)(\d+)/;
-  const matches = regex.exec(res);
+  const matches = res.match(/(?:line\s+)(\d+)/i)
   if (matches) {
     const editorLine = getEditorLineNumber(Number(matches[1]))
     console.log(res, matches[1], editorLine);
@@ -150,9 +176,9 @@ export function process_user_input() {
         message: res,
         severity: monaco.MarkerSeverity.Error,
         startLineNumber: editorLine,
-        startColumn: 0,
+        startColumn: 1,
         endLineNumber: editorLine,
-        endColumn: 999,
+        endColumn: 100,
       }
     ]
     monaco.editor.setModelMarkers(model, "owner", markers);
@@ -222,6 +248,8 @@ function upside_down() {
 
 // when user types e.g. 'forall', replace it instantly with the proper forall unicode symbol, and 
 // keep the user's cursor at the correct position so that user can continue typing.
+
+// this is horrible and should be rewritten based on string length i think
 function replace_words_by_fancy_symbols() {
   let proofstr = editor.getValue();
   let offset = -1;
