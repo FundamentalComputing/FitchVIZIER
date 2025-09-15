@@ -303,6 +303,18 @@ function download_proof() {
   document.body.removeChild(element);
 };
 
+function findNumberedLineUp(monacoLineNumber: int) {
+  let lineNumber = null;
+  let monacoLineNumber2 = monacoLineNumber;
+  while (!lineNumber && monacoLineNumber2 > 0) {
+    const line = model.getValue().split("\n")[monacoLineNumber2 - 1]
+    lineNumber = parseInt(line.split(" ")[0])
+    monacoLineNumber2 -= 1;
+  }
+
+  return lineNumber
+}
+
 
 // Listen to content changes (fires on every keystroke)
 model.onDidChangeContent((event) => {
@@ -310,16 +322,19 @@ model.onDidChangeContent((event) => {
 
   // Check if the change includes a new line
   event.changes.forEach(change => {
-    if (change.text.includes('\n')) {
+    if (change.text.includes('\n') && change.text.length < 3) {
       // A new line was inserted
       const position = editor.getPosition();
-      if (position.lineNumber == 1) return
 
       // Insert something after the new line
       setTimeout(() => {
         const currentPosition = editor.getPosition();
+        // const line = model.getValue().split("\n")[currentPosition.lineNumber - 2]
+        // const lineNumber = parseInt(line.split("|")[0])
+        const lineNumber = findNumberedLineUp(currentPosition.lineNumber - 1)
         const line = model.getValue().split("\n")[currentPosition.lineNumber - 2]
-        const lineNumber = parseInt(line.split("|")[0])
+        const depth = line.split("|").length
+
         editor.executeEdits('insert-after-newline', [{
           range: new monaco.Range(
             currentPosition.lineNumber,
@@ -327,7 +342,7 @@ model.onDidChangeContent((event) => {
             currentPosition.lineNumber,
             currentPosition.column
           ),
-          text: `${lineNumber + 1} | `
+          text: `${lineNumber + 1} ${Array.from(Array(depth)).join("| ")}`
         }]);
       }, 0);
     }
