@@ -1,12 +1,25 @@
 @import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&display=swap');
 
+* {
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+}
+
 body {
   text-align: center;
-  padding-left: 200px;
-  padding-right: 200px;
+  /* padding-left: 200px; */
+  /* padding-right: 200px; */
+  padding-bottom: 3em;
   background-color: black;
   color: white;
   font-family: monospace;
+}
+
+header {
+  padding-top: 1em;
+  padding-bottom: 1em;
+  margin: 0;
 }
 
 a {
@@ -14,21 +27,30 @@ a {
   text-decoration: none;
 }
 
-#additional-examples a:link {
-  color: black;
-  text-decoration: underline;
-}
-
-textarea {
-  border: 4px solid black;
-  color: black;
+#additional-examples {
+  padding-top: 10px;
+  border: 3px solid black;
   border-radius: 10px;
-  padding: 8px;
-  font-family: monospace
+  color: white;
+  max-width: 100ch;
+  margin-bottom: 1em;
+  margin-left: auto;
+  margin-right: auto;
+  background-color: #1e1e1e;
 }
 
-textarea:disabled {
-  background-color: lightgray;
+#additional-examples a:link {
+  color: white;
+  text-decoration: underline solid rgb(150, 150, 150);
+}
+
+#additional-examples ul {
+  list-style-type: none;
+  padding: 0px;
+  margin: 0px;
+
+  padding-top: 10px;
+  padding-bottom: 20px;
 }
 
 
@@ -37,7 +59,7 @@ textarea:disabled {
   color: white;
   font-size: 20px;
   margin: 2mm;
-  background-color: #232323;
+  background-color: #1e1e1e;
   display: inline-block;
   padding: 4mm;
   border-radius: 12px;
@@ -63,8 +85,16 @@ code {
   display: none;
 }
 
+#editor_wrapper {
+  display: flex;
+  justify-content: center;
+  padding-left: 1em;
+  padding-right: 1em;
+}
+
 #editor {
   width: 100%;
+  max-width: 90rem;
   height: 500px;
   border: 1px solid #ccc;
   text-align: left;

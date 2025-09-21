@@ -8,16 +8,16 @@
 <body>
   <script type="module" src="/src/main.ts"></script>
 
-  <p><strong style="font-size:50px;color:white;"><span style="color: red;">Better</span>Fitch<em>VIZIER</em></strong>
-  </p>
+  <header>
+    <p>
+      <strong style="font-size:50px;color:white;"><span style="color: red;">Better</span>Fitch<em>VIZIER</em></strong>
+    </p>
+  </header>
 
-  <!-- beautify ignore:start -->
-  <div id="editor"></div>
-  <textarea spellcheck="false" rows=30 cols=90 id="proof-field">
-1 | A
-  |----
-2 | A           Reit: 1</textarea><br>
-<!-- beautify ignore:end -->
+  <div id="editor_wrapper">
+
+    <div id="editor"></div>
+  </div>
 
   <br>
   <div id="feedback" class="important-box" style="font-weight:bold">
@@ -48,9 +48,7 @@
   <button id="settings-button" title="Toggle visibility of advanced settings">ADVANCED SETTINGS</button>
   <br>
   <br>
-  <div id="additional-examples"
-    style="padding-top:10px;background-color: white;border: 3px solid black;border-radius: 10px;color:black; max-width: 100ch; margin-bottom: 1em; margin-left: auto; margin-right: auto; "
-    hidden>
+  <div id="additional-examples" hidden>
     <strong>Example proofs</strong>
     <ul>
       <li><a href="javascript:load_example(0);">A ∧ B ⊢ B ∧ A</a></li>
