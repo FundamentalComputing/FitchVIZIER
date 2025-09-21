@@ -250,9 +250,9 @@ function insertNewline(editor: monaco.editor.IStandaloneCodeEditor) {
     // Single cursor - insert pipe at cursor position
     const pos = editor.getPosition();
     const lineNumber = findNumberedLineUp(pos.lineNumber);
+    if (!lineNumber) return;
     const line = model.getValue().split("\n")[pos.lineNumber - 1];
     const depth = line ? line.split("|").length - 1 : 1;
-    console.log("dsads", lineNumber);
 
     editor.executeEdits("insert-after-newline", [{
       range: new monaco.Range(
@@ -319,7 +319,6 @@ export function process_user_input() {
   const matches = res.match(/(?:line\s+)(\d+)/i);
   if (matches) {
     const editorLine = getEditorLineNumber(Number(matches[1]));
-    console.log(res, matches[1], editorLine);
     const markers: monaco.editor.IMarkerData[] = [
       {
         message: res,
@@ -475,7 +474,7 @@ function download_proof() {
   document.body.removeChild(element);
 }
 
-function findNumberedLineUp(monacoLineNumber: number) {
+function findNumberedLineUp(monacoLineNumber: number): number | null {
   let lineNumber = null;
   let monacoLineNumber2 = monacoLineNumber;
   while (!lineNumber && monacoLineNumber2 > 0) {
@@ -484,6 +483,7 @@ function findNumberedLineUp(monacoLineNumber: number) {
     monacoLineNumber2 -= 1;
   }
 
+  if (isNaN(lineNumber)) return null;
   return lineNumber;
 }
 
