@@ -1,3 +1,4 @@
+// @ts-ignore
 import "@fontsource-variable/fira-code";
 import "./style.css";
 import {
