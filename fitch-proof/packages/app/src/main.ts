@@ -280,6 +280,7 @@ function insertNewline(
 ) {
   const selection = editor.getSelection();
   const model = editor.getModel();
+  let lineNumberOffset = 1;
 
   if (selection.isEmpty()) {
     // Single cursor - insert pipe at cursor position
@@ -294,12 +295,12 @@ function insertNewline(
 
     if (lineType == "premise") {
       if (depth > 1 && !shiftPressed || shiftPressed && depth <= 1) {
+        lineNumberOffset = 2;
         text = `\n ${" |".repeat(depth)}---${text}`;
       }
     } else {
       if (shiftPressed) {
-        text = `\n${" ".repeat(lineNumber.toString().length)} ${"| ".repeat(depth)
-          }`;
+        text = `\n${" ".repeat(lineNumber.toString().length)} ${"| ".repeat(depth)}`;
       }
     }
 
@@ -312,6 +313,13 @@ function insertNewline(
       ),
       text,
     }]);
+
+    editor.setPosition(
+      new monaco.Position(
+        pos.lineNumber + lineNumberOffset,
+        999 | pos.column,
+      ),
+    );
   } else {
     console.log("selection not implemented");
   }
