@@ -84,13 +84,14 @@ code {
 
 #editor_container {
   width: 100%;
+  position: relative;
   max-width: 90rem;
   /* min-height: calc(100vh - 280px); */
   text-align: left;
 }
 
 #editor {
-  min-height: calc(100vh - 310px);
+  min-height: calc(100vh - 250px);
 }
 
 
@@ -109,6 +110,7 @@ code {
   display: flex;
   flex-direction: column-reverse;
   justify-content: center;
+  background: transparent;
 }
 
 #feedback {
@@ -118,7 +120,7 @@ code {
   /* padding-top: 4.5mm; */
   display: flex;
   align-items: center;
-  font-size: 12px;
+  font-size: 16px;
 }
 
 #typing-guide {
@@ -127,6 +129,11 @@ code {
   border-bottom-left-radius: 0px;
   text-wrap: nowrap;
   text-align: right;
+  position: absolute;
+  bottom: 50px;
+  padding-right: 20px;
+  width: 100%;
+  background: transparent;
 }
 
 #button_row {
