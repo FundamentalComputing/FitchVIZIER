@@ -162,7 +162,11 @@ editor.addCommand(monaco.KeyMod.Shift | monaco.KeyCode.Tab, function() {
 });
 
 editor.addCommand(monaco.KeyCode.Enter, function() {
-  insertNewline(editor);
+  insertNewline(editor, false);
+});
+
+editor.addCommand(monaco.KeyMod.Shift | monaco.KeyCode.Enter, function() {
+  insertNewline(editor, true);
 });
 
 function insertPipe(editor: monaco.editor.IStandaloneCodeEditor) {
@@ -242,7 +246,36 @@ function removePipe(editor: monaco.editor.IStandaloneCodeEditor) {
   }
 }
 
-function insertNewline(editor: monaco.editor.IStandaloneCodeEditor) {
+function getLineByMonacoNumber(monacoLineNr: number) {
+  return model.getValue().split("\n")[monacoLineNr - 1];
+}
+
+function getLineDepth(line: string) {
+  return line ? line.split("|").length - 1 : 1;
+}
+
+function isFitchBar(line: string) {
+  return line.includes("|-");
+}
+
+
+function getLineType(moncaoLineNr: number) {
+  let currentLineNr = moncaoLineNr;
+  const initialLine = getLineByMonacoNumber(currentLineNr);
+  const initialDepth = getLineDepth(initialLine);
+  if (isFitchBar(initialLine)) return "fitchbar";
+  while (currentLineNr > 0) {
+    const line = getLineByMonacoNumber(currentLineNr);
+    const depth = getLineDepth(line);
+    if (depth < initialDepth) return "premise";
+    if (depth > initialDepth) return "conclusion";
+    if (isFitchBar(line) && depth == initialDepth) return "conclusion";
+    currentLineNr--;
+  };
+  return "premise";
+}
+
+function insertNewline(editor: monaco.editor.IStandaloneCodeEditor, shiftPressed: boolean) {
   const selection = editor.getSelection();
   const model = editor.getModel();
 
@@ -251,8 +284,16 @@ function insertNewline(editor: monaco.editor.IStandaloneCodeEditor) {
     const pos = editor.getPosition();
     const lineNumber = findNumberedLineUp(pos.lineNumber);
     if (!lineNumber) return;
-    const line = model.getValue().split("\n")[pos.lineNumber - 1];
-    const depth = line ? line.split("|").length - 1 : 1;
+    const line = getLineByMonacoNumber(pos.lineNumber);
+    const depth = getLineDepth(line);
+    const lineType = getLineType(pos.lineNumber);
+
+    let text = `\n${lineNumber + 1} ${"| ".repeat(depth)}`;
+    const defaultActionIsFitchBar = lineType == "premise" && depth > 1;
+    if (shiftPressed ? !defaultActionIsFitchBar : defaultActionIsFitchBar) {
+      console.log("should insert fitch bar");
+      text = `\n ${" |".repeat(depth)}---${text}`;
+    }
 
     editor.executeEdits("insert-after-newline", [{
       range: new monaco.Range(
@@ -261,7 +302,7 @@ function insertNewline(editor: monaco.editor.IStandaloneCodeEditor) {
         pos.lineNumber,
         999 | pos.column,
       ),
-      text: `\n${lineNumber + 1} ${"| ".repeat(depth)}`,
+      text,
     }]);
   } else {
     console.log("selection not implemented");
@@ -299,7 +340,9 @@ function getEditorLineNumber(fitchLine: number) {
 export function process_user_input() {
   replace_words_by_fancy_symbols();
 
-  const allowedVariableNamesField = document.getElementById("allowed-variable-names",);
+  const allowedVariableNamesField = document.getElementById(
+    "allowed-variable-names",
+  );
   if (!(allowedVariableNamesField instanceof HTMLInputElement)) {
     throw new Error(`allowed variable names field is of wrong node type`);
   }
