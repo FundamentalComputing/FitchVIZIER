@@ -84,7 +84,6 @@ code {
 
 #editor_container {
   width: 100%;
-  position: relative;
   max-width: 90rem;
   /* min-height: calc(100vh - 280px); */
   text-align: left;
@@ -92,6 +91,7 @@ code {
 
 #editor {
   min-height: calc(100vh - 250px);
+  position: relative;
 }
 
 
@@ -130,7 +130,7 @@ code {
   text-wrap: nowrap;
   text-align: right;
   position: absolute;
-  bottom: 50px;
+  bottom: 0px;
   padding-right: 20px;
   width: 100%;
   background: transparent;

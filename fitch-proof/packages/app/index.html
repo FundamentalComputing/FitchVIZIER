@@ -16,21 +16,20 @@
 
   <div id="editor_wrapper">
     <div id="editor_container">
-      <div id="editor"></div>
-
-      <!-- <div class="row"> -->
-      <div id="typing-guide" class="important-box">
-        <!-- Typing guide: -->
-        <span style="color:red">∧</span>:<span style=color:lightblue>and</span>
-        <span style="color:red">∨</span>:<span style=color:lightblue>or</span>
-        <span style="color:red">¬</span>:<span style=color:lightblue>not/neg</span>
-        <span style="color:red">→</span>:<span style=color:lightblue>impl</span>
-        <span style="color:red">↔</span>:<span style=color:lightblue>bic</span>
-        <span style="color:red">⊥</span>:<span style=color:lightblue>bot</span>
-        <span style="color:red">∀</span>:<span style=color:lightblue>fa</span>
-        <span style="color:red">∃</span>:<span style=color:lightblue>ex</span>
+      <div style="position: relative;">
+        <div id="editor"></div>
+        <div id="typing-guide" class="important-box">
+          <!-- Typing guide: -->
+          <span style="color:red">∧</span>:<span style=color:lightblue>and</span>
+          <span style="color:red">∨</span>:<span style=color:lightblue>or</span>
+          <span style="color:red">¬</span>:<span style=color:lightblue>not/neg</span>
+          <span style="color:red">→</span>:<span style=color:lightblue>impl</span>
+          <span style="color:red">↔</span>:<span style=color:lightblue>bic</span>
+          <span style="color:red">⊥</span>:<span style=color:lightblue>bot</span>
+          <span style="color:red">∀</span>:<span style=color:lightblue>fa</span>
+          <span style="color:red">∃</span>:<span style=color:lightblue>ex</span>
+        </div>
       </div>
-      <!-- </div> -->
 
       <div id="feedback" class="important-box" style="font-weight:bold">
       </div>
@@ -38,9 +37,6 @@
   </div>
 
   <footer>
-
-
-
     <div id="button_row">
       <button id="latex-button" title="Export proof to LaTeX">EXPORT TO LATEX</button>
       <button id="format-button" title="Make your proof more beautiful!">FORMAT PROOF (Ctrl+S)</button>
