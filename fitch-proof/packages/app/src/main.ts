@@ -258,7 +258,6 @@ function isFitchBar(line: string) {
   return line.includes("|-");
 }
 
-
 function getLineType(moncaoLineNr: number) {
   let currentLineNr = moncaoLineNr;
   const initialLine = getLineByMonacoNumber(currentLineNr);
@@ -271,11 +270,14 @@ function getLineType(moncaoLineNr: number) {
     if (depth > initialDepth) return "conclusion";
     if (isFitchBar(line) && depth == initialDepth) return "conclusion";
     currentLineNr--;
-  };
+  }
   return "premise";
 }
 
-function insertNewline(editor: monaco.editor.IStandaloneCodeEditor, shiftPressed: boolean) {
+function insertNewline(
+  editor: monaco.editor.IStandaloneCodeEditor,
+  shiftPressed: boolean,
+) {
   const selection = editor.getSelection();
   const model = editor.getModel();
 
@@ -289,10 +291,16 @@ function insertNewline(editor: monaco.editor.IStandaloneCodeEditor, shiftPressed
     const lineType = getLineType(pos.lineNumber);
 
     let text = `\n${lineNumber + 1} ${"| ".repeat(depth)}`;
-    const defaultActionIsFitchBar = lineType == "premise" && depth > 1;
-    if (shiftPressed ? !defaultActionIsFitchBar : defaultActionIsFitchBar) {
-      console.log("should insert fitch bar");
-      text = `\n ${" |".repeat(depth)}---${text}`;
+
+    if (lineType == "premise") {
+      if (depth > 1 && !shiftPressed || shiftPressed && depth <= 1) {
+        text = `\n ${" |".repeat(depth)}---${text}`;
+      }
+    } else {
+      if (shiftPressed) {
+        text = `\n${" ".repeat(lineNumber.toString().length)} ${"| ".repeat(depth)
+          }`;
+      }
     }
 
     editor.executeEdits("insert-after-newline", [{
