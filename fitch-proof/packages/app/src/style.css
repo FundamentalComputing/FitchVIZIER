@@ -54,19 +54,9 @@ a {
 }
 
 
-.important-box {
-  border: 3px solid black;
-  color: white;
-  font-size: 20px;
-  margin: 2mm;
-  background-color: #1e1e1e;
-  display: inline-block;
-  padding: 4mm;
-  border-radius: 12px;
-}
 
 button {
-  padding: 4px;
+  padding: 8px;
   margin: 0px;
   background: #232323;
   border-radius: 4px;
@@ -92,10 +82,58 @@ code {
   padding-right: 1em;
 }
 
-#editor {
+#editor_container {
   width: 100%;
   max-width: 90rem;
-  height: 500px;
-  border: 1px solid #ccc;
+  /* min-height: calc(100vh - 280px); */
   text-align: left;
+}
+
+#editor {
+  min-height: calc(100vh - 310px);
+}
+
+
+.important-box {
+  /* border: 3px solid black; */
+  color: white;
+  font-size: 20px;
+  background-color: #1e1e1e;
+  display: inline-block;
+  padding: 4mm;
+  /* border-radius: 12px; */
+}
+
+.row {
+  width: 100%;
+  display: flex;
+  flex-direction: column-reverse;
+  justify-content: center;
+}
+
+#feedback {
+  background-color: green;
+  /* border-top-right-radius: 0px; */
+  /* border-bottom-right-radius: 0px; */
+  /* padding-top: 4.5mm; */
+  display: flex;
+  align-items: center;
+  font-size: 12px;
+}
+
+#typing-guide {
+  flex-grow: 1;
+  border-top-left-radius: 0px;
+  border-bottom-left-radius: 0px;
+  text-wrap: nowrap;
+  text-align: right;
+}
+
+#button_row {
+  display: flex;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 1rem;
+  padding-top: 1rem;
+  padding-bottom: 1rem;
 }

@@ -15,68 +15,71 @@
   </header>
 
   <div id="editor_wrapper">
+    <div id="editor_container">
+      <div id="editor"></div>
 
-    <div id="editor"></div>
+      <div class="row">
+        <div id="feedback" class="important-box" style="font-weight:bold">
+        </div>
+        <div id="typing-guide" class="important-box">
+          <!-- Typing guide: -->
+          <span style="color:red">∧</span>:<span style=color:lightblue>and</span>
+          <span style="color:red">∨</span>:<span style=color:lightblue>or</span>
+          <span style="color:red">¬</span>:<span style=color:lightblue>not/neg</span>
+          <span style="color:red">→</span>:<span style=color:lightblue>impl</span>
+          <span style="color:red">↔</span>:<span style=color:lightblue>bic</span>
+          <span style="color:red">⊥</span>:<span style=color:lightblue>bot</span>
+          <span style="color:red">∀</span>:<span style=color:lightblue>fa</span>
+          <span style="color:red">∃</span>:<span style=color:lightblue>ex</span>
+        </div>
+      </div>
+    </div>
   </div>
 
-  <br>
-  <div id="feedback" class="important-box" style="font-weight:bold">
-  </div>
-  <br>
-  <div class="important-box">
-    Typing guide:
-    <span style="color:red">∧</span>:<span style=color:lightblue>and</span>
-    <span style="color:red">∨</span>:<span style=color:lightblue>or</span>
-    <span style="color:red">¬</span>:<span style=color:lightblue>not/neg</span>
-    <span style="color:red">→</span>:<span style=color:lightblue>impl</span>
-    <span style="color:red">↔</span>:<span style=color:lightblue>bic</span>
-    <span style="color:red">⊥</span>:<span style=color:lightblue>bot</span>
-    <span style="color:red">∀</span>:<span style=color:lightblue>fa</span>
-    <span style="color:red">∃</span>:<span style=color:lightblue>ex</span>
-  </div>
+  <footer>
 
-  <br>
-  <br>
 
-  <button id="latex-button" title="Export proof to LaTeX">EXPORT TO LATEX</button>
-  <button id="format-button" title="Make your proof more beautiful!">FORMAT PROOF (Ctrl+S)</button>
-  <button id="fix-line-numbers-button"
-    title="Fix the line numbers in a proof, and automatically update justifications. For example, suppose you want to delete a line in the middle of your proof. In that case, you can just delete that line and press this button afterwards, which will fix up the line numbers. If you want to insert a line in the middle of your proof, just initially give it a line number of 100 or so, and click this button afterwards.">FIX
-    LINE NUMBERS</button>
-  <button id="load-example-button" title="Load example proofs">SHOW EXAMPLES</button>
-  <button id="download-button" title="Download this proof as a .txt file">DOWNLOAD</button>
-  <button id="settings-button" title="Toggle visibility of advanced settings">ADVANCED SETTINGS</button>
-  <br>
-  <br>
-  <div id="additional-examples" hidden>
-    <strong>Example proofs</strong>
-    <ul>
-      <li><a href="javascript:load_example(0);">A ∧ B ⊢ B ∧ A</a></li>
-      <li><a href="javascript:load_example(1);">P(a) ∧ P(b), a=c ∨ b=c ⊢ P(c)</a></li>
-      <li><a href="javascript:load_example(2);">∀x∃y R(x,y) → ∃y∀x R(x,y) ⊢ ∃x(∀y ¬R(x,y) ∨ ∀y R(y,x))</a></li>
-    </ul>
-  </div>
-  <div id="advanced-settings"
-    style="padding-top:10px;background-color: white;border: 3px solid black;border-radius: 10px;color:black; max-width: 100ch; margin-left: auto; margin-right: auto; "
-    hidden>
-    <strong>Advanced Settings (do not change unless you really have a good reason)</strong>
-    <br>
-    <br>
-    <p>List of strings that should be recognized as variables (separated by commas): <input id="allowed-variable-names"
-        value="x,y,z,u,v,w" /><br>
-      <em>(For example, using the default settings, having ∀x P(x) is allowed, but having ∀a P(a) is not, because a
-        is
-        not used for variables. With this setting, you can change which strings should be seen as a variable. All
-        other
-        strings that start with a lowercase letter will be seen as a constant or function symbol, depending on the
-        context in which they are found.)</em>
-    </p>
-    <br />
-    <p>Rotate the proof by 180 degrees: <button id="upside-down-button" title="Rotate proof...">ROTATE
-        PROOF...</button></p>
-  </div>
 
-  <p>Fork by Hailey | <a href="https://github.com/Code-For-Groningen/BetterVIZIER">Source code</a></p>
+    <div id="button_row">
+      <button id="latex-button" title="Export proof to LaTeX">EXPORT TO LATEX</button>
+      <button id="format-button" title="Make your proof more beautiful!">FORMAT PROOF (Ctrl+S)</button>
+      <button id="fix-line-numbers-button"
+        title="Fix the line numbers in a proof, and automatically update justifications. For example, suppose you want to delete a line in the middle of your proof. In that case, you can just delete that line and press this button afterwards, which will fix up the line numbers. If you want to insert a line in the middle of your proof, just initially give it a line number of 100 or so, and click this button afterwards.">FIX
+        LINE NUMBERS</button>
+      <button id="load-example-button" title="Load example proofs">SHOW EXAMPLES</button>
+      <button id="download-button" title="Download this proof as a .txt file">DOWNLOAD</button>
+      <button id="settings-button" title="Toggle visibility of advanced settings">ADVANCED SETTINGS</button>
+    </div>
+    <div id="additional-examples" hidden>
+      <strong>Example proofs</strong>
+      <ul>
+        <li><a href="javascript:load_example(0);">A ∧ B ⊢ B ∧ A</a></li>
+        <li><a href="javascript:load_example(1);">P(a) ∧ P(b), a=c ∨ b=c ⊢ P(c)</a></li>
+        <li><a href="javascript:load_example(2);">∀x∃y R(x,y) → ∃y∀x R(x,y) ⊢ ∃x(∀y ¬R(x,y) ∨ ∀y R(y,x))</a></li>
+      </ul>
+    </div>
+    <div id="advanced-settings"
+      style="padding-top:10px;background-color: white;border: 3px solid black;border-radius: 10px;color:black; max-width: 100ch; margin-left: auto; margin-right: auto; "
+      hidden>
+      <strong>Advanced Settings (do not change unless you really have a good reason)</strong>
+      <br>
+      <br>
+      <p>List of strings that should be recognized as variables (separated by commas): <input
+          id="allowed-variable-names" value="x,y,z,u,v,w" /><br>
+        <em>(For example, using the default settings, having ∀x P(x) is allowed, but having ∀a P(a) is not, because a
+          is
+          not used for variables. With this setting, you can change which strings should be seen as a variable. All
+          other
+          strings that start with a lowercase letter will be seen as a constant or function symbol, depending on the
+          context in which they are found.)</em>
+      </p>
+      <br />
+      <p>Rotate the proof by 180 degrees: <button id="upside-down-button" title="Rotate proof...">ROTATE
+          PROOF...</button></p>
+    </div>
+
+    <p>Fork by Hailey | <a href="https://github.com/Code-For-Groningen/BetterVIZIER">Source code</a></p>
+  </footer>
 </body>
 
 </html>
