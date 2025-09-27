@@ -1,19 +1,8 @@
-# What is this?
+# FitchVIZIER
 
-This is a fork of the real thing.
+Available at: https://fitch.rug.themisjudge.nl/
 
-The goal is to enable proving at the speed of thought.
-
-Available at: https://code-for-groningen.github.io/BetterVIZIER/
-
-Changes so far:
-- Ctrl + S to format
-- Actual dark mode
-- More sensible template
-- Monaco Editor instead of textarea
-- Auto new line number
-- Syntax highlighting
-
+## What is this?
 This is a formal proof validator, which determines the correctness of Fitch-style natural deduction proofs ("Fitch proofs").
 
 The tool was developed by Aron Hardeman and used by students who follow the course Introduction to Logic (for CS) at the University of Groningen (the Netherlands).
