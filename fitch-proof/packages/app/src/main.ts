@@ -300,7 +300,8 @@ function insertNewline(
       }
     } else {
       if (shiftPressed) {
-        text = `\n${" ".repeat(lineNumber.toString().length)} ${"| ".repeat(depth)}`;
+        text = `\n${" ".repeat(lineNumber.toString().length)} ${"| ".repeat(depth)
+          }`;
       }
     }
 
@@ -368,11 +369,11 @@ export function process_user_input() {
     allowedVariableNamesField.value,
   );
   if (res.startsWith("The proof is correct!")) {
-    document.getElementById("feedback").style.color = "green";
+    document.getElementById("feedback").style.background = "green";
   } else if (res.startsWith("Fatal error")) {
-    document.getElementById("feedback").style.color = "red";
+    document.getElementById("feedback").style.background = "red";
   } else {
-    document.getElementById("feedback").style.color = "#f05a1f";
+    document.getElementById("feedback").style.background = "#f05a1f";
   }
   document.getElementById("feedback").innerText = res;
   const matches = res.match(/(?:line\s+)(\d+)/i);
