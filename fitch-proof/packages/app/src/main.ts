@@ -176,7 +176,7 @@ function insertPipe(editor: monaco.editor.IStandaloneCodeEditor) {
   if (selection.isEmpty()) {
     // Single cursor - insert pipe at cursor position
     const position = editor.getPosition();
-    
+
     editor.pushUndoStop();
     editor.executeEdits("insert-pipe", [{
       range: new monaco.Range(
@@ -316,7 +316,7 @@ function insertNewline(
 
     // Push an undo stop before the edit to ensure proper undo behavior
     editor.pushUndoStop();
-    
+
     editor.executeEdits("insert-after-newline", [{
       range: new monaco.Range(
         pos.lineNumber,
@@ -326,7 +326,7 @@ function insertNewline(
       ),
       text,
     }]);
-    
+
     // Push another undo stop after the edit to create a discrete undo operation
     editor.pushUndoStop();
 
@@ -413,6 +413,14 @@ export function process_user_input() {
 
 function format() {
   const formatted = format_proof(editor.getValue());
+  if (formatted == "invalid") {
+    // alert("proof invalid cannot format");
+    const feedbackEl = document.getElementById("feedback");
+    feedbackEl.classList.remove("wiggle");
+    feedbackEl.offsetHeight;
+    feedbackEl.classList.add("wiggle");
+    return;
+  }
 
   const selection = editor.getSelection();
   const pos = editor.getPosition();
