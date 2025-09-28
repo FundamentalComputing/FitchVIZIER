@@ -176,6 +176,8 @@ function insertPipe(editor: monaco.editor.IStandaloneCodeEditor) {
   if (selection.isEmpty()) {
     // Single cursor - insert pipe at cursor position
     const position = editor.getPosition();
+    
+    editor.pushUndoStop();
     editor.executeEdits("insert-pipe", [{
       range: new monaco.Range(
         position.lineNumber,
@@ -185,6 +187,7 @@ function insertPipe(editor: monaco.editor.IStandaloneCodeEditor) {
       ),
       text: "| ",
     }]);
+    editor.pushUndoStop();
   } else {
     // Multi-line selection - add pipe at start of each line
     const startLine = selection.startLineNumber;
@@ -198,7 +201,9 @@ function insertPipe(editor: monaco.editor.IStandaloneCodeEditor) {
       });
     }
 
+    editor.pushUndoStop();
     editor.executeEdits("insert-pipe-multiline", edits);
+    editor.pushUndoStop();
   }
 }
 
@@ -214,6 +219,7 @@ function removePipe(editor: monaco.editor.IStandaloneCodeEditor) {
     if (
       position.column > 1 && lineContent.charAt(position.column - 2) === "|"
     ) {
+      editor.pushUndoStop();
       editor.executeEdits("remove-pipe", [{
         range: new monaco.Range(
           position.lineNumber,
@@ -223,6 +229,7 @@ function removePipe(editor: monaco.editor.IStandaloneCodeEditor) {
         ),
         text: "",
       }]);
+      editor.pushUndoStop();
     }
   } else {
     // Multi-line selection - remove pipe from start of each line
@@ -241,7 +248,9 @@ function removePipe(editor: monaco.editor.IStandaloneCodeEditor) {
     }
 
     if (edits.length > 0) {
+      editor.pushUndoStop();
       editor.executeEdits("remove-pipe-multiline", edits);
+      editor.pushUndoStop();
     }
   }
 }
@@ -305,6 +314,9 @@ function insertNewline(
       }
     }
 
+    // Push an undo stop before the edit to ensure proper undo behavior
+    editor.pushUndoStop();
+    
     editor.executeEdits("insert-after-newline", [{
       range: new monaco.Range(
         pos.lineNumber,
@@ -314,6 +326,9 @@ function insertNewline(
       ),
       text,
     }]);
+    
+    // Push another undo stop after the edit to create a discrete undo operation
+    editor.pushUndoStop();
 
     editor.setPosition(
       new monaco.Position(
