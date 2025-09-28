@@ -419,11 +419,6 @@ function format() {
     feedbackEl.classList.remove("wiggle");
     feedbackEl.offsetHeight;
     feedbackEl.classList.add("wiggle");
-    // setTimeout(
-    //   () => document.getElementById("feedback").classList.remove("wiggle"),
-    //   1000,
-    // );
-    //
     return;
   }
 
