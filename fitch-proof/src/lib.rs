@@ -121,7 +121,7 @@ pub fn proof_is_correct(proof: &str) -> bool {
 pub fn format_proof(proof: &str) -> String {
     match parser::parse_fitch_proof(proof) {
         Ok(lines) if !lines.is_empty() => formatter::format_proof(lines),
-        _ => proof.to_owned(),
+        _ => "invalid".to_string(),
     }
 }
 
