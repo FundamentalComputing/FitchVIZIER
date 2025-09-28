@@ -4,7 +4,7 @@ This is a fork of the real thing.
 
 The goal is to enable proving at the speed of thought.
 
-Available at: https://code-for-groningen.github.io/BetterVIZIER/
+Available at: https://fitch.wireva.eu/ (or https://code-for-groningen.github.io/BetterVIZIER/)
 
 Changes so far:
 - Ctrl + S to format
