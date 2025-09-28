@@ -487,17 +487,9 @@ let proof_is_upside_down = false;
 function upside_down() {
   proof_is_upside_down = !proof_is_upside_down;
   if (proof_is_upside_down) {
-    document.getElementById("proof-field").style.setProperty(
-      "-webkit-transform",
-      "rotate(180deg)",
-      null,
-    );
+    document.getElementById("editor_container").classList.add("rotate-180");
   } else {
-    document.getElementById("proof-field").style.setProperty(
-      "-webkit-transform",
-      "rotate(0deg)",
-      null,
-    );
+    document.getElementById("editor_container").classList.remove("rotate-180");
   }
 }
 

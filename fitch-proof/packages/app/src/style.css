@@ -8,8 +8,6 @@
 
 body {
   text-align: center;
-  /* padding-left: 200px; */
-  /* padding-right: 200px; */
   padding-bottom: 3em;
   background-color: black;
   color: white;
@@ -85,8 +83,14 @@ code {
 #editor_container {
   width: 100%;
   max-width: 90rem;
-  /* min-height: calc(100vh - 280px); */
   text-align: left;
+  transition-property: all;
+  transition-duration: 5000ms;
+  transition-timing-function: linear;
+}
+
+.rotate-180 {
+  transform: rotate(180deg);
 }
 
 #editor {
@@ -94,15 +98,12 @@ code {
   position: relative;
 }
 
-
 .important-box {
-  /* border: 3px solid black; */
   color: white;
   font-size: 20px;
   background-color: #1e1e1e;
   display: inline-block;
   padding: 4mm;
-  /* border-radius: 12px; */
 }
 
 .row {
@@ -115,9 +116,6 @@ code {
 
 #feedback {
   background-color: green;
-  /* border-top-right-radius: 0px; */
-  /* border-bottom-right-radius: 0px; */
-  /* padding-top: 4.5mm; */
   display: flex;
   align-items: center;
   font-size: 16px;
@@ -176,7 +174,3 @@ code {
   animation-delay: 0ms;
   animation-duration: 500ms;
 }
-
-/* h1.wiggle:hover { */
-/*   animation: none; */
-/* } */
