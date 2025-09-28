@@ -150,8 +150,6 @@ editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, function() {
   format();
 });
 
-// VIBE CODE SECTION
-
 // Add custom key bindings
 editor.addCommand(monaco.KeyCode.Tab, function() {
   insertPipe(editor);
@@ -174,31 +172,23 @@ function insertPipe(editor: monaco.editor.IStandaloneCodeEditor) {
   // const model = editor.getModel();
 
   if (selection.isEmpty()) {
-    // Single cursor - insert pipe at cursor position
     const position = editor.getPosition();
+    const lineContent = model.getLineContent(position.lineNumber);
+
+    const column = lineContent.length - lineContent.split("").reverse().findIndex((v) => v == '|');
+
+    editor.pushUndoStop();
     editor.executeEdits("insert-pipe", [{
       range: new monaco.Range(
         position.lineNumber,
-        position.column,
+        column - 1,
         position.lineNumber,
-        position.column,
+        column,
       ),
-      text: "| ",
+      text: " | ",
     }]);
-  } else {
-    // Multi-line selection - add pipe at start of each line
-    const startLine = selection.startLineNumber;
-    const endLine = selection.endLineNumber;
-    const edits = [];
-
-    for (let lineNumber = startLine; lineNumber <= endLine; lineNumber++) {
-      edits.push({
-        range: new monaco.Range(lineNumber, 1, lineNumber, 1),
-        text: "| ",
-      });
-    }
-
-    editor.executeEdits("insert-pipe-multiline", edits);
+    editor.setPosition(new monaco.Position(position.lineNumber, column + 4));
+    editor.pushUndoStop();
   }
 }
 
@@ -207,41 +197,23 @@ function removePipe(editor: monaco.editor.IStandaloneCodeEditor) {
   const model = editor.getModel();
 
   if (selection.isEmpty()) {
-    // Single cursor - remove pipe before cursor if it exists
     const position = editor.getPosition();
     const lineContent = model.getLineContent(position.lineNumber);
 
-    if (
-      position.column > 1 && lineContent.charAt(position.column - 2) === "|"
-    ) {
+    const column = lineContent.length - lineContent.split("").reverse().findIndex((v) => v == '|');
+    if (column > 3) {
+      editor.pushUndoStop();
       editor.executeEdits("remove-pipe", [{
         range: new monaco.Range(
           position.lineNumber,
-          position.column - 1,
+          column - 2,
           position.lineNumber,
-          position.column,
+          column,
         ),
         text: "",
       }]);
-    }
-  } else {
-    // Multi-line selection - remove pipe from start of each line
-    const startLine = selection.startLineNumber;
-    const endLine = selection.endLineNumber;
-    const edits = [];
-
-    for (let lineNumber = startLine; lineNumber <= endLine; lineNumber++) {
-      const lineContent = model.getLineContent(lineNumber);
-      if (lineContent.startsWith("|")) {
-        edits.push({
-          range: new monaco.Range(lineNumber, 1, lineNumber, 2),
-          text: "",
-        });
-      }
-    }
-
-    if (edits.length > 0) {
-      editor.executeEdits("remove-pipe-multiline", edits);
+      editor.setPosition(new monaco.Position(position.lineNumber, column));
+      editor.pushUndoStop();
     }
   }
 }
@@ -305,6 +277,9 @@ function insertNewline(
       }
     }
 
+    // Push an undo stop before the edit to ensure proper undo behavior
+    editor.pushUndoStop();
+
     editor.executeEdits("insert-after-newline", [{
       range: new monaco.Range(
         pos.lineNumber,
@@ -314,6 +289,9 @@ function insertNewline(
       ),
       text,
     }]);
+
+    // Push another undo stop after the edit to create a discrete undo operation
+    editor.pushUndoStop();
 
     editor.setPosition(
       new monaco.Position(
@@ -398,6 +376,14 @@ export function process_user_input() {
 
 function format() {
   const formatted = format_proof(editor.getValue());
+  if (formatted == "invalid") {
+    // alert("proof invalid cannot format");
+    const feedbackEl = document.getElementById("feedback");
+    feedbackEl.classList.remove("wiggle");
+    feedbackEl.offsetHeight;
+    feedbackEl.classList.add("wiggle");
+    return;
+  }
 
   const selection = editor.getSelection();
   const pos = editor.getPosition();
@@ -413,7 +399,6 @@ function format() {
     lineNumber: pos.lineNumber,
     column: editor.getModel().getLineMaxColumn(pos.lineNumber),
   });
-  // document.getElementById("proof-field").value = formatted;
   process_user_input();
 }
 
@@ -464,17 +449,9 @@ let proof_is_upside_down = false;
 function upside_down() {
   proof_is_upside_down = !proof_is_upside_down;
   if (proof_is_upside_down) {
-    document.getElementById("proof-field").style.setProperty(
-      "-webkit-transform",
-      "rotate(180deg)",
-      null,
-    );
+    document.getElementById("editor_container").classList.add("rotate-180");
   } else {
-    document.getElementById("proof-field").style.setProperty(
-      "-webkit-transform",
-      "rotate(0deg)",
-      null,
-    );
+    document.getElementById("editor_container").classList.remove("rotate-180");
   }
 }
 
@@ -483,10 +460,15 @@ const replacements = {
   "ex": "∃",
   "not": "¬",
   "neg": "¬",
+  "!": "¬",
   "impl": "→",
+  "->": "→",
   "bic": "↔",
   "and": "∧",
+  "&": "∧",
+  "*": "∧",
   "or": "∨",
+  "+": "∨",
   "bot": "⊥",
 };
 
