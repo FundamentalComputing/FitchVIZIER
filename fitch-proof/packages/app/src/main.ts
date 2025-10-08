@@ -583,7 +583,7 @@ document.getElementById("load-example-button").onclick = show_examples;
 document.getElementById("download-button").onclick = download_proof;
 document.getElementById("upside-down-button").onclick = upside_down;
 document.getElementById("fix-line-numbers-button").onclick = fix_line_numbers;
-document.getElementById("allowed-variable-names").onkeyup = process_user_input;
+document.getElementById("allowed-variable-names").onkeyup = () => process_user_input();
 document.getElementById("settings-button").onclick =
   toggle_show_advanced_settings;
 
