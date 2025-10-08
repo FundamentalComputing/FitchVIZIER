@@ -80,14 +80,11 @@ code {
   width: 100%;
   max-width: 90rem;
   text-align: left;
-  transition-property: transform;
+  transition-property: rotate;
   transition-duration: 5000ms;
   transition-timing-function: linear;
 }
 
-.rotate-180 {
-  transform: rotate(180deg);
-}
 
 #editor {
   min-height: calc(100vh - 250px);
