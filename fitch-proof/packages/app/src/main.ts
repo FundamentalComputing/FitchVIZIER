@@ -11,8 +11,8 @@ import {
 } from "@workspace/library";
 import * as monaco from "monaco-editor";
 import { tsParticles } from "@tsparticles/engine";
-import "@tsparticles/preset-confetti"
-import { loadConfettiPreset } from '@tsparticles/preset-confetti'
+import "@tsparticles/preset-confetti";
+import { loadConfettiPreset } from '@tsparticles/preset-confetti';
 // import MonacoErrorLens, { type MonacoEditor } from "@ym-han/monaco-error-lens";
 import examples from "./examples.ts";
 
@@ -386,16 +386,16 @@ export function process_user_input(firstRun = false) {
 
   const lastLineNr = model.getFullModelRange().endLineNumber;
 
-  const premises = []
+  const premises = [];
   for (let lineNr = 1; lineNr < lastLineNr; lineNr++) {
-    const line = getLineByMonacoNumber(lineNr)
+    const line = getLineByMonacoNumber(lineNr);
     if (isFitchBar(line)) break;
-    const content = line.split('|').at(-1).trimStart()
-    if (content) premises.push(content)
+    const content = line.split('|').at(-1).trimStart();
+    if (content) premises.push(content);
   }
 
   // check if proof target was reached
-  const checkRes: string = check_proof_with_template(model.getValue(), [...premises, proofTarget], "xyzuvw")
+  const checkRes: string = check_proof_with_template(model.getValue(), [...premises, proofTarget], "xyzuvw");
   if (checkRes.includes('correct') && !confettiPlayed) {
     confettiPlayed = true;
     if (!firstRun) {
@@ -404,7 +404,7 @@ export function process_user_input(firstRun = false) {
         options: {
           preset: "confetti",
         },
-      })
+      });
     }
   }
 
@@ -518,7 +518,7 @@ function replaceWithSymbols(input: string) {
       return { result: input.replace(token, replacement), offset };
     }
   }
-  return { result: input, offset }
+  return { result: input, offset };
 }
 
 // when user types e.g. 'forall', replace it instantly with the proper forall unicode symbol, and
@@ -527,6 +527,7 @@ function replaceWithSymbols(input: string) {
 function replace_words_by_fancy_symbols() {
   let proofstr = editor.getValue();
   let offset: number;
+  // eslint-disable-next-line prefer-const
   ({ result: proofstr, offset } = replaceWithSymbols(proofstr));
   if (offset == -1) {
     return;
@@ -588,7 +589,7 @@ document.getElementById("settings-button").onclick =
 
 proofTargetEl.addEventListener("keyup", function(e) {
   const raw = (e.target as HTMLInputElement).value;
-  const replaced = replaceWithSymbols(raw).result
+  const replaced = replaceWithSymbols(raw).result;
   proofTarget = replaced;
   proofTargetEl.value = replaced;
   confettiPlayed = false;
