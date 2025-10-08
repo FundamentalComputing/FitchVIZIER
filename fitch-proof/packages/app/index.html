@@ -7,6 +7,7 @@
 
 <body>
   <script type="module" src="/src/main.ts"></script>
+  <link href="/src/style.css" rel="stylesheet">
 
   <header>
     <p>
@@ -18,16 +19,21 @@
     <div id="editor_container">
       <div style="position: relative;">
         <div id="editor"></div>
-        <div id="typing-guide" class="important-box">
-          <!-- Typing guide: -->
-          <span style="color:red">∧</span>:<span style=color:lightblue>and/&/*</span>
-          <span style="color:red">∨</span>:<span style=color:lightblue>or/+</span>
-          <span style="color:red">¬</span>:<span style=color:lightblue>not/neg/!</span>
-          <span style="color:red">→</span>:<span style=color:lightblue>impl/-></span>
-          <span style="color:red">↔</span>:<span style=color:lightblue>bic</span>
-          <span style="color:red">⊥</span>:<span style=color:lightblue>bot</span>
-          <span style="color:red">∀</span>:<span style=color:lightblue>fa</span>
-          <span style="color:red">∃</span>:<span style=color:lightblue>ex</span>
+        <div class="absolute bottom-0 flex flex-nowrap justify-between w-full px-4 pb-2 text-lg">
+          <div class="flex-grow text-nowrap">∴ <input type="text" class="flex-grow w-full"
+              placeholder="What do you want to prove?" id='proof_target'>
+          </div>
+          <div id="typing-guide2" class="">
+            <!-- Typing guide: -->
+            <span style="color:red">∧</span>:<span style=color:lightblue>and/&/*</span>
+            <span style="color:red">∨</span>:<span style=color:lightblue>or/+</span>
+            <span style="color:red">¬</span>:<span style=color:lightblue>not/neg/!</span>
+            <span style="color:red">→</span>:<span style=color:lightblue>impl/-></span>
+            <span style="color:red">↔</span>:<span style=color:lightblue>bic</span>
+            <span style="color:red">⊥</span>:<span style=color:lightblue>bot</span>
+            <span style="color:red">∀</span>:<span style=color:lightblue>fa</span>
+            <span style="color:red">∃</span>:<span style=color:lightblue>ex</span>
+          </div>
         </div>
       </div>
 

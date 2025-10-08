@@ -1,16 +1,21 @@
 // @ts-ignore
 import "@fontsource-variable/fira-code";
-import "./style.css";
+// import "./style.css";
 import {
   check_proof,
+  check_proof_with_template,
   export_to_latex,
   fix_line_numbers_in_proof,
   format_proof,
   init,
 } from "@workspace/library";
 import * as monaco from "monaco-editor";
+import { tsParticles } from "@tsparticles/engine";
+import "@tsparticles/preset-confetti"
+import { loadConfettiPreset } from '@tsparticles/preset-confetti'
 // import MonacoErrorLens, { type MonacoEditor } from "@ym-han/monaco-error-lens";
 import examples from "./examples.ts";
+
 
 declare global {
   interface Window {
@@ -18,6 +23,11 @@ declare global {
     load_example: (index: number) => void;
   }
 }
+
+const proofTargetEl = document.getElementById("proof_target") as HTMLInputElement;
+let proofTarget = proofTargetEl.value;
+let confettiPlayed = false;
+loadConfettiPreset(tsParticles);
 
 monaco.languages.register({
   id: "fitch",
@@ -332,7 +342,7 @@ function getEditorLineNumber(fitchLine: number) {
     l.startsWith(fitchLine.toString())
   ) + 1;
 }
-export function process_user_input() {
+export function process_user_input(firstRun = false) {
   replace_words_by_fancy_symbols();
 
   const allowedVariableNamesField = document.getElementById(
@@ -372,6 +382,32 @@ export function process_user_input() {
   } else {
     monaco.editor.setModelMarkers(model, "owner", []);
   }
+
+
+  const lastLineNr = model.getFullModelRange().endLineNumber;
+
+  const premises = []
+  for (let lineNr = 1; lineNr < lastLineNr; lineNr++) {
+    const line = getLineByMonacoNumber(lineNr)
+    if (isFitchBar(line)) break;
+    const content = line.split('|').at(-1).trimStart()
+    if (content) premises.push(content)
+  }
+
+  // check if proof target was reached
+  const checkRes: string = check_proof_with_template(model.getValue(), [...premises, proofTarget], "xyzuvw")
+  if (checkRes.includes('correct') && !confettiPlayed) {
+    confettiPlayed = true;
+    if (!firstRun) {
+      tsParticles.load({
+        id: "tsparticles",
+        options: {
+          preset: "confetti",
+        },
+      })
+    }
+  }
+
 }
 
 function format() {
@@ -472,20 +508,26 @@ const replacements = {
   "bot": "⊥",
 };
 
+
+function replaceWithSymbols(input: string) {
+  let offset = -1;
+  for (const [token, replacement] of Object.entries(replacements)) {
+    // we obnly ever have one token at the time (I hope). calculate the offset and replace it
+    if (input.includes(token)) {
+      offset = token.length - 1;
+      return { result: input.replace(token, replacement), offset };
+    }
+  }
+  return { result: input, offset }
+}
+
 // when user types e.g. 'forall', replace it instantly with the proper forall unicode symbol, and
 // keep the user's cursor at the correct position so that user can continue typing.
 //
 function replace_words_by_fancy_symbols() {
   let proofstr = editor.getValue();
-  let offset = -1;
-  for (const [token, replacement] of Object.entries(replacements)) {
-    // we obnly ever have one token at the time (I hope). calculate the offset and replace it
-    if (proofstr.includes(token)) {
-      offset = token.length - 1;
-      proofstr = proofstr.replace(token, replacement);
-      break;
-    }
-  }
+  let offset: number;
+  ({ result: proofstr, offset } = replaceWithSymbols(proofstr));
   if (offset == -1) {
     return;
   }
@@ -544,5 +586,13 @@ document.getElementById("allowed-variable-names").onkeyup = process_user_input;
 document.getElementById("settings-button").onclick =
   toggle_show_advanced_settings;
 
+proofTargetEl.addEventListener("keyup", function(e) {
+  const raw = (e.target as HTMLInputElement).value;
+  const replaced = replaceWithSymbols(raw).result
+  proofTarget = replaced;
+  proofTargetEl.value = replaced;
+  confettiPlayed = false;
+});
+
 await init();
-process_user_input();
+process_user_input(true);
