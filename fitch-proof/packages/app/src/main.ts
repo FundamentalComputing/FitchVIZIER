@@ -15,6 +15,7 @@ import "@tsparticles/preset-confetti";
 import { loadConfettiPreset } from '@tsparticles/preset-confetti';
 // import MonacoErrorLens, { type MonacoEditor } from "@ym-han/monaco-error-lens";
 import examples from "./examples.ts";
+import excercises from "./excercises.ts";
 
 
 declare global {
@@ -267,8 +268,8 @@ function insertNewline(
   if (selection.isEmpty()) {
     // Single cursor - insert pipe at cursor position
     const pos = editor.getPosition();
-    const lineNumber = findNumberedLineUp(pos.lineNumber);
-    if (!lineNumber) return;
+    let lineNumber = findNumberedLineUp(pos.lineNumber);
+    if (!lineNumber) lineNumber = 0;
     const line = getLineByMonacoNumber(pos.lineNumber);
     const depth = getLineDepth(line);
     const lineType = getLineType(pos.lineNumber);
@@ -506,6 +507,20 @@ export function load_example(index: number) {
 
 window.load_example = load_example;
 
+function load_random_excercise() {
+  const excercise = excercises[(Math.random() * excercises.length) | 0];
+  proofTarget = excercise.conclusion;
+  proofTargetEl.value = proofTarget;
+
+  let assumptionsCompiled = "";
+  for (let i = 0; i < excercise.assumptions.length; i++) {
+    assumptionsCompiled += `${i + 1} | ${excercise.assumptions[i]}\n`;
+  }
+  assumptionsCompiled += "  |----";
+  model.setValue(assumptionsCompiled);
+
+}
+
 let proof_is_upside_down = false;
 function upside_down() {
   proof_is_upside_down = !proof_is_upside_down;
@@ -605,6 +620,7 @@ model.onDidChangeContent((_event: monaco.editor.IModelContentChangedEvent) => {
 document.getElementById("format-button").onclick = format;
 document.getElementById("latex-button").onclick = to_latex;
 document.getElementById("load-example-button").onclick = show_examples;
+document.getElementById("load-excercise-button").onclick = load_random_excercise;
 document.getElementById("download-button").onclick = download_proof;
 document.getElementById("upside-down-button").onclick = upside_down;
 document.getElementById("fix-line-numbers-button").onclick = fix_line_numbers;
