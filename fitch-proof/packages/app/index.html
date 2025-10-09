@@ -19,8 +19,8 @@
     <div id="editor_container">
       <div style="position: relative;">
         <div id="editor"></div>
-        <div class="absolute bottom-0 flex flex-nowrap justify-between w-full px-4 pb-2 text-lg">
-          <div class="flex-grow text-nowrap">∴ <input type="text" class="flex-grow w-full"
+        <div class="absolute bottom-0 flex flex-wrap justify-between w-full px-4 pb-2 text-lg">
+          <div class="flex-grow text-nowrap pr-4"><span>🏁 </span><input type="text" class="flex-grow w-full"
               placeholder="What do you want to prove?" id='proof_target'>
           </div>
           <div id="typing-guide2" class="">
@@ -50,6 +50,7 @@
         title="Fix the line numbers in a proof, and automatically update justifications. For example, suppose you want to delete a line in the middle of your proof. In that case, you can just delete that line and press this button afterwards, which will fix up the line numbers. If you want to insert a line in the middle of your proof, just initially give it a line number of 100 or so, and click this button afterwards.">FIX
         LINE NUMBERS</button>
       <button id="load-example-button" title="Load example proofs">SHOW EXAMPLES</button>
+      <button id="load-excercise-button" title="Load randm excercise">RANDOM EXCERCISE</button>
       <button id="download-button" title="Download this proof as a .txt file">DOWNLOAD</button>
       <button id="settings-button" title="Toggle visibility of advanced settings">ADVANCED SETTINGS</button>
     </div>
