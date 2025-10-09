@@ -397,9 +397,12 @@ export function process_user_input(firstRun = false) {
 
   // check if proof target was reached
   const checkRes: string = check_proof_with_template(model.getValue(), [...premises, proofTarget], "xyzuvw");
+  console.log(checkRes);
   if (checkRes.includes('correct') && !confettiPlayed) {
     confettiPlayed = true;
+    console.log('yes');
     if (!firstRun) {
+      console.log('fr');
       tsParticles.load({
         id: "tsparticles",
 
@@ -511,6 +514,7 @@ function load_random_excercise() {
   const excercise = excercises[(Math.random() * excercises.length) | 0];
   proofTarget = excercise.conclusion;
   proofTargetEl.value = proofTarget;
+  confettiPlayed = false;
 
   let assumptionsCompiled = "";
   for (let i = 0; i < excercise.assumptions.length; i++) {
