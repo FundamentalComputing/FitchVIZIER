@@ -262,7 +262,6 @@ function insertNewline(
   shiftPressed: boolean,
 ) {
   const selection = editor.getSelection();
-  const model = editor.getModel();
   let lineNumberOffset = 1;
 
   if (selection.isEmpty()) {
@@ -396,8 +395,12 @@ export function process_user_input(firstRun = false) {
   }
 
   // check if proof target was reached
-  const checkRes: string = check_proof_with_template(model.getValue(), [...premises, proofTarget], "xyzuvw");
-  console.log(checkRes);
+  const checkRes: string = check_proof_with_template(
+    model.getValue(),
+    [...premises, proofTarget],
+    allowedVariableNamesField.value
+  );
+
   if (checkRes.includes('correct') && !confettiPlayed) {
     confettiPlayed = true;
     console.log('yes');
