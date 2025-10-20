@@ -553,6 +553,7 @@ const replacements = {
   "or": "∨",
   "+": "∨",
   "bot": "⊥",
+  "\u200B": " ",
 };
 
 
