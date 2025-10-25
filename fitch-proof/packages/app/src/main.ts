@@ -26,7 +26,7 @@ import { confettiConfig } from "./confetti.ts";
 // window.Alpine = Alpine;
 
 interface TabsStore {
-  files: { name: string, proofTarget: string, confettiPlayed: boolean }[];
+  files: { name: string, uri: monaco.Uri, proofTarget: string, confettiPlayed: boolean }[];
   current: number;
 }
 
@@ -45,7 +45,7 @@ const initModel = monaco.editor.createModel(initContent, "fitch", uri);
 
 Alpine.store('tabs', {
   current: 0,
-  files: [{ name: 'new.fitch', proofTarget: "", confettiPlayed: false }],
+  files: [{ name: 'new.txt', proofTarget: "", confettiPlayed: false, uri }],
 });
 
 
@@ -119,10 +119,10 @@ function saveToLocalStorage() {
     hasLoadedLocalStorage = true;
     return;
   }
-  const data = storeData.files.map((file, index) => {
-    const content = monaco.editor.getModels()[index].getValue();
+  const data = storeData.files.map((file) => {
+    const content = monaco.editor.getModel(file.uri).getValue();
 
-    return { ...file, content };
+    return { ...file, content, uri: file.uri.toString() };
   });
 
   localStorage.setItem("tabs", JSON.stringify({ files: data, current: storeData.current }));
@@ -140,10 +140,16 @@ function loadFromLocalStorage() {
   const newTabsData: TabsStore = { current: importedData.current, files: [] };
   let highestNewFile = 1;
   for (const tab of importedData.files) {
-    const uri = monaco.Uri.parse(`inmemory://${tab.name}`);
+    // @ts-ignore
+    const uri = monaco.Uri.parse(tab.uri);
     // @ts-ignore 
     monaco.editor.createModel(tab.content, "fitch", uri);
-    newTabsData.files.push({ name: tab.name, confettiPlayed: tab.confettiPlayed, proofTarget: tab.proofTarget });
+    newTabsData.files.push({
+      name: tab.name,
+      confettiPlayed: tab.confettiPlayed,
+      proofTarget: tab.proofTarget,
+      uri
+    });
 
     if (tab.name.startsWith("new-")) {
       const n = parseInt(tab.name.slice(4));
@@ -172,29 +178,52 @@ function closeTab(index: number) {
   Alpine.store("tabs").files.splice(index, 1);
   Alpine.store("tabs").current = current;
 
-  editor.setModel(monaco.editor.getModels()[current]);
+  const model = monaco.editor.getModel(files[current].uri);
+  editor.setModel(model);
   setTimeout(() => { // it errors without this and im too tired to fix it properly
     monaco.editor.getModels()[index].dispose();
   }, 100);
 }
 window.closeTab = closeTab;
 
+async function loadFileIntoMonaco(file: File) {
+  // Read the file content
+  const content = await file.text();
+  // Create a Monaco URI
+  const uri = monaco.Uri.parse(`file:///${file.name}`);
+  // Check if a model already exists for this URI
+  let model = monaco.editor.getModel(uri);
+  if (model) {
+    // Update existing model
+    model.setValue(content);
+  } else {
+    // Create new model
+    model = monaco.editor.createModel(
+      content,
+      undefined, // language (auto-detected from file extension)
+      uri
+    );
+  }
+  return uri;
+}
 
 async function openFile() {
   const file = await getFile();
   if (file) {
-    const len = Alpine.store("tabs").files.push({ proofTarget: "", confettiPlayed: false, name: file.name });
+    const uri = await loadFileIntoMonaco(file);
+    const len = Alpine.store("tabs").files.push({ proofTarget: "", confettiPlayed: false, name: file.name, uri });
     Alpine.store("tabs").current = len - 1;
   }
+  saveToLocalStorage();
 }
 
 
 let newFileCounter = 1;
 function newFile(content?: string) {
-  const uri = monaco.Uri.parse(`inmemory://new-${newFileCounter}.fitch`);
+  const uri = monaco.Uri.parse(`inmemory://new-${newFileCounter}.txt`);
   monaco.editor.createModel(content ?? initContent, "fitch", uri);
   const len = Alpine.store("tabs").files.push({
-    name: `new-${newFileCounter}.fitch`, proofTarget: "", confettiPlayed: false
+    name: `new-${newFileCounter}.txt`, proofTarget: "", confettiPlayed: false, uri
   });
   Alpine.store("tabs").current = len - 1;
   newFileCounter++;
