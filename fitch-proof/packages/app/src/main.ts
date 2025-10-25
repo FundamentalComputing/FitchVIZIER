@@ -51,6 +51,7 @@ declare global {
   interface Window {
     editor: monaco.editor.IStandaloneCodeEditor;
     load_example: (index: number) => void;
+    closeTab: (index: number) => void;
   }
 }
 
@@ -110,7 +111,7 @@ editor.addCommand(monaco.KeyMod.Shift | monaco.KeyCode.Enter, function() {
 });
 
 
-async function loadFileIntoMonaco(file) {
+async function loadFileIntoMonaco(file: File) {
   // Read the file content
   const content = await file.text();
 
@@ -134,6 +135,28 @@ async function loadFileIntoMonaco(file) {
 
   return model;
 }
+
+function closeTab(index: number) {
+  let current = Alpine.store("tabs").current;
+  const files = Alpine.store("tabs").files;
+  if (files.length < 2) {
+    return;
+  }
+  if (current == index) { // if we close current tab, pick a new one
+    current = (current + 1 > files.length) ? current : current - 1;
+  } else {
+    current--;
+    if (current < 0) current = 0;
+  }
+  Alpine.store("tabs").files.splice(index, 1);
+  Alpine.store("tabs").current = current;
+
+  editor.setModel(monaco.editor.getModels()[current]);
+  setTimeout(() => { // it errors without this and im too tired to fix it properly
+    monaco.editor.getModels()[index].dispose();
+  }, 100);
+}
+window.closeTab = closeTab;
 
 
 async function openFile() {
@@ -281,7 +304,11 @@ function insertNewline(
 }
 
 export function process_user_input(firstRun = false) {
-  const model = editor.getModel();
+  let model = editor.getModel();
+  if (!model) {
+    editor.setModel(monaco.editor.getModels()[Alpine.store("tabs").current]);
+    model = editor.getModel();
+  };
   const editorValue = editor.getValue();
   replace_words_by_fancy_symbols();
 
@@ -343,9 +370,7 @@ export function process_user_input(firstRun = false) {
 
   if (checkRes.includes('correct') && !confettiPlayed) {
     confettiPlayed = true;
-    console.log('yes');
     if (!firstRun) {
-      console.log('fr');
       tsParticles.load(confettiConfig);
     }
   }
@@ -509,10 +534,8 @@ proofTargetEl.addEventListener("keyup", function(e) {
 
 Alpine.start();
 
-
 Alpine.effect(() => {
   const storeData = Alpine.store("tabs");
-  console.log("tab change", storeData.current);
   editor.setModel(monaco.editor.getModels()[storeData.current]);
 });
 
