@@ -17,6 +17,35 @@ import { loadConfettiPreset } from '@tsparticles/preset-confetti';
 import examples from "./examples.ts";
 import excercises from "./excercises.ts";
 
+import Alpine from 'alpinejs';
+import { languagedef, theme } from "./languagedef.ts";
+import { getEditorLineNumber, getFile, getLineByMonacoNumber, getLineDepth, getLineType, isFitchBar, replaceWithSymbols } from "./helpers.ts";
+import { confettiConfig } from "./confetti.ts";
+// window.Alpine = Alpine;
+
+interface TabsStore {
+  files: { model: monaco.editor.IModel, name: string }[];
+  current: number;
+}
+
+// Extend Alpine's Stores interface
+declare module 'alpinejs' {
+  interface Stores {
+    tabs: TabsStore;
+  }
+}
+
+const initContent = `1 | A
+  |----
+2 | A           Reit: 1`;
+const uri = monaco.Uri.parse("inmemory://test");
+const initModel = monaco.editor.createModel(initContent, "fitch", uri);
+
+Alpine.store('tabs', {
+  current: 0,
+  files: [{ model: initModel, name: 'new.fitch' }],
+});
+
 
 declare global {
   interface Window {
@@ -34,114 +63,15 @@ monaco.languages.register({
   id: "fitch",
   extensions: [".fitch", ".txt"],
   aliases: ["Fitch Proof", "fitch"],
-  mimetypes: ["text/fitch"],
+  mimetypes: ["text/plain"],
 });
 
-// Define the syntax highlighting rules
-monaco.languages.setMonarchTokensProvider("fitch", {
-  tokenizer: {
-    root: [
-      // Line numbers at start
-      [/^\s*\d+/, "line-number"],
-
-      // Proof structure - vertical bars and dashes
-      [/\s*\|\s*/, "proof-structure"],
-      [/\s*-+\s*/, "proof-structure"],
-
-      // Logical operators and symbols
-      [/∧/, "operator.conjunction"],
-      [/∨/, "operator.disjunction"],
-      [/¬/, "operator.negation"],
-      [/→/, "operator.implication"],
-      [/↔/, "operator.biconditional"],
-      [/∀/, "quantifier.universal"],
-      [/∃/, "quantifier.existential"],
-      [/⊥/, "operator.falsum"],
-      [/⊤/, "operator.verum"],
-      [/=/, "operator.equality"],
-      [/≠/, "operator.inequality"],
-
-      // Parentheses and brackets
-      [/[()[\]{}]/, "delimiter"],
-
-      // Predicate/function names (capital letters)
-      [/[A-Z][a-zA-Z0-9]*/, "predicate"],
-
-      // Variables and constants (lowercase)
-      [/[a-z][a-zA-Z0-9]*/, "variable"],
-
-      // Function applications like f(a), g(x,y)
-      [/[a-z]+(?=\()/, "function"],
-
-      // Justifications - rule names
-      [
-        /\b(Reit|∧\s*Elim|∨\s*Elim|∧\s*Intro|∨\s*Intro|→\s*Elim|→\s*Intro|¬\s*Elim|¬\s*Intro|=\s*Elim|=\s*Intro|∀\s*Elim|∀\s*Intro|∃\s*Elim|∃\s*Intro|⊥\s*Elim|RAA|MT|DS|HS|Add|Simp|Conj|MP|DeM|DN|Com|Assoc|Dist|Exp|Equiv|Impl|Taut|Contra)\b/,
-        "rule-name",
-      ],
-
-      // Line references in justifications (numbers, ranges)
-      [/:\s*\d+/, "justification.reference"],
-      [/\d+-\d+/, "justification.reference"],
-      [/,\s*\d+/, "justification.reference"],
-
-      // Comma separator
-      [/,/, "delimiter"],
-
-      // Whitespace
-      [/\s+/, "white"],
-    ],
-  },
-});
-
-// Define the color theme
-monaco.editor.defineTheme("fitch-theme", {
-  base: "vs-dark",
-  inherit: true,
-  rules: [
-    { token: "line-number", foreground: "888888", fontStyle: "bold" },
-    { token: "proof-structure", foreground: "888888" },
-    { token: "operator.conjunction", foreground: "CC6666", fontStyle: "bold" },
-    { token: "operator.disjunction", foreground: "CC6666", fontStyle: "bold" },
-    { token: "operator.negation", foreground: "CC6666", fontStyle: "bold" },
-    { token: "operator.implication", foreground: "CC6666", fontStyle: "bold" },
-    {
-      token: "operator.biconditional",
-      foreground: "CC6666",
-      fontStyle: "bold",
-    },
-    { token: "operator.falsum", foreground: "FF4444", fontStyle: "bold" },
-    { token: "operator.verum", foreground: "44FF44", fontStyle: "bold" },
-    { token: "operator.equality", foreground: "CC6666", fontStyle: "bold" },
-    { token: "operator.inequality", foreground: "CC6666", fontStyle: "bold" },
-    { token: "quantifier.universal", foreground: "9966CC", fontStyle: "bold" },
-    {
-      token: "quantifier.existential",
-      foreground: "9966CC",
-      fontStyle: "bold",
-    },
-    { token: "predicate", foreground: "99CC99" },
-    { token: "function", foreground: "CCCC66" },
-    { token: "variable", foreground: "99CCFF" },
-    { token: "rule-name", foreground: "FF9966", fontStyle: "italic" },
-    { token: "justification.reference", foreground: "CCCCCC" },
-    { token: "delimiter", foreground: "#87875f" },
-  ],
-  colors: {
-    "editor.background": "#1e1e1e",
-  },
-});
-
-const value = `1 | A
-  |----
-2 | A           Reit: 1`;
-const uri = monaco.Uri.parse("inmemory://test");
-const model = monaco.editor.createModel(value, "fitch", uri);
+// Define the syntax highlighting rules and color theme
+monaco.languages.setMonarchTokensProvider("fitch", languagedef);
+monaco.editor.defineTheme("fitch-theme", theme);
 
 const editor = monaco.editor.create(document.getElementById("editor"), {
-  //   value: `1 | A
-  //   |----
-  // 2 | A           Reit: 1`,
-  model,
+  model: initModel,
   language: "fitch",
   theme: "fitch-theme",
   lineNumbers: "off",
@@ -156,6 +86,7 @@ const editor = monaco.editor.create(document.getElementById("editor"), {
   },
 });
 window.editor = editor;
+
 
 editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, function() {
   format();
@@ -178,13 +109,59 @@ editor.addCommand(monaco.KeyMod.Shift | monaco.KeyCode.Enter, function() {
   insertNewline(editor, true);
 });
 
+
+async function loadFileIntoMonaco(file) {
+  // Read the file content
+  const content = await file.text();
+
+  // Create a Monaco URI
+  const uri = monaco.Uri.parse(`file:///${file.name}`);
+
+  // Check if a model already exists for this URI
+  let model = monaco.editor.getModel(uri);
+
+  if (model) {
+    // Update existing model
+    model.setValue(content);
+  } else {
+    // Create new model
+    model = monaco.editor.createModel(
+      content,
+      undefined, // language (auto-detected from file extension)
+      uri
+    );
+  }
+
+  return model;
+}
+
+
+async function openFile() {
+  const file = await getFile();
+  if (file) {
+    const model = await loadFileIntoMonaco(file);
+    // editor.setModel(model);
+    const len = Alpine.store("tabs").files.push({ model, name: file.name });
+    Alpine.store("tabs").current = len - 1;
+  }
+}
+
+let newFileCounter = 1;
+async function newFile() {
+  const uri = monaco.Uri.parse(`inmemory://new-${newFileCounter}.fitch`);
+  const model = monaco.editor.createModel(initContent, "fitch", uri);
+  const len = Alpine.store("tabs").files.push({ model, name: `new-${newFileCounter}.fitch` });
+  Alpine.store("tabs").current = len - 1;
+  newFileCounter++;
+}
+
 function insertPipe(editor: monaco.editor.IStandaloneCodeEditor) {
   const selection = editor.getSelection();
   // const model = editor.getModel();
 
   if (selection.isEmpty()) {
     const position = editor.getPosition();
-    const lineContent = model.getLineContent(position.lineNumber);
+    const lineContent = editor.getModel().getLineContent(position.lineNumber);
 
     const column = lineContent.length - lineContent.split("").reverse().findIndex((v) => v == '|');
 
@@ -229,33 +206,6 @@ function removePipe(editor: monaco.editor.IStandaloneCodeEditor) {
   }
 }
 
-function getLineByMonacoNumber(monacoLineNr: number) {
-  return model.getValue().split("\n")[monacoLineNr - 1];
-}
-
-function getLineDepth(line: string) {
-  return line ? line.split("|").length - 1 : 1;
-}
-
-function isFitchBar(line: string) {
-  return line.includes("|-");
-}
-
-function getLineType(moncaoLineNr: number) {
-  let currentLineNr = moncaoLineNr;
-  const initialLine = getLineByMonacoNumber(currentLineNr);
-  const initialDepth = getLineDepth(initialLine);
-  if (isFitchBar(initialLine)) return "fitchbar";
-  while (currentLineNr > 0) {
-    const line = getLineByMonacoNumber(currentLineNr);
-    const depth = getLineDepth(line);
-    if (depth < initialDepth) return "premise";
-    if (depth > initialDepth) return "conclusion";
-    if (isFitchBar(line) && depth == initialDepth) return "conclusion";
-    currentLineNr--;
-  }
-  return "premise";
-}
 
 function insertNewline(
   editor: monaco.editor.IStandaloneCodeEditor,
@@ -269,9 +219,9 @@ function insertNewline(
     const pos = editor.getPosition();
     let lineNumber = findNumberedLineUp(pos.lineNumber);
     if (!lineNumber) lineNumber = 0;
-    const line = getLineByMonacoNumber(pos.lineNumber);
+    const line = getLineByMonacoNumber(editor.getValue(), pos.lineNumber);
     const depth = getLineDepth(line);
-    const lineType = getLineType(pos.lineNumber);
+    const lineType = getLineType(editor.getValue(), pos.lineNumber);
 
     let text = `\n${lineNumber + 1} ${"| ".repeat(depth)}`;
 
@@ -314,35 +264,9 @@ function insertNewline(
   }
 }
 
-// Create Error Lens instance
-// const errorLens = new MonacoErrorLens(editor, monaco, {
-//   enabled: false,
-//   enableInlineMessages: true,
-//   enableLineHighlights: true,
-//   enableGutterIcons: true,
-//   followCursor: "allLines", // Only show diagnostics for current line
-//   // messageTemplate: 'hi [{source}] {message}', // Custom message format
-//   messageTemplate: "hi",
-//   maxMessageLength: 1000, // Truncate long messages
-//   updateDelay: 200, // Debounce delay in ms
-//   colors: {
-//     error: {
-//       background: "rgba(255, 0, 0, 0.1)",
-//       foreground: "#ff4444",
-//     },
-//     warning: {
-//       background: "rgba(255, 165, 0, 0.1)",
-//       foreground: "#ff8800",
-//     },
-//   },
-// });
-
-function getEditorLineNumber(fitchLine: number) {
-  return editor.getValue().split("\n").findIndex((l) =>
-    l.startsWith(fitchLine.toString())
-  ) + 1;
-}
 export function process_user_input(firstRun = false) {
+  const model = editor.getModel();
+  const editorValue = editor.getValue();
   replace_words_by_fancy_symbols();
 
   const allowedVariableNamesField = document.getElementById(
@@ -366,7 +290,7 @@ export function process_user_input(firstRun = false) {
   document.getElementById("feedback").innerText = res;
   const matches = res.match(/(?:line\s+)(\d+)/i);
   if (matches) {
-    const editorLine = getEditorLineNumber(Number(matches[1]));
+    const editorLine = getEditorLineNumber(editorValue, Number(matches[1]));
     const markers: monaco.editor.IMarkerData[] = [
       {
         message: res,
@@ -388,7 +312,7 @@ export function process_user_input(firstRun = false) {
 
   const premises = [];
   for (let lineNr = 1; lineNr < lastLineNr; lineNr++) {
-    const line = getLineByMonacoNumber(lineNr);
+    const line = getLineByMonacoNumber(editorValue, lineNr);
     if (isFitchBar(line)) break;
     const content = line.split('|').at(-1).trimStart();
     if (content) premises.push(content);
@@ -406,37 +330,7 @@ export function process_user_input(firstRun = false) {
     console.log('yes');
     if (!firstRun) {
       console.log('fr');
-      tsParticles.load({
-        id: "tsparticles",
-
-        options: {
-          emitters: {
-            position: { x: 50, y: 100 },
-            rate: { quantity: 100, delay: 0.05 },
-            life: { duration: 1, count: 1 }
-          },
-          particles: {
-            move: {
-              direction: "top",
-              enable: true,
-              outModes: "destroy",
-              speed: { min: 10, max: 20 },
-              gravity: { enable: true, acceleration: 9.8 }
-            },
-            number: { value: 0 },
-            opacity: { value: 1 },
-            shape: { type: ["square", "circle"] },
-            size: { value: { min: 3, max: 8 } },
-            color: { value: ["#FF6B6B", "#4ECDC4", "#FFD93D", "#6BCF7F", "#C77DFF"] },
-            life: { duration: { value: 3 } },
-            rotate: {
-              value: { min: 0, max: 360 },
-              direction: "random",
-              animation: { enable: true, speed: 30 }
-            }
-          }
-        }
-      });
+      tsParticles.load(confettiConfig);
     }
   }
 
@@ -499,7 +393,7 @@ function show_examples() {
   document.getElementById("additional-examples").hidden = !examples_are_visible;
 }
 export function load_example(index: number) {
-  let rdy = model.getValue() == "";
+  let rdy = editor.getModel().getValue() == "";
   if (!rdy) {
     rdy = confirm(
       "Your proof area is not empty. Loading an example will overwrite your current proof. Are you sure you want to continue?",
@@ -524,7 +418,8 @@ function load_random_excercise() {
     assumptionsCompiled += `${i + 1} | ${excercise.assumptions[i]}\n`;
   }
   assumptionsCompiled += "  |----";
-  model.setValue(assumptionsCompiled);
+  // todo: open in new tab
+  editor.getModel().setValue(assumptionsCompiled);
 
 }
 
@@ -538,36 +433,6 @@ function upside_down() {
   }
 }
 
-const replacements = {
-  "fa": "∀",
-  "ex": "∃",
-  "not": "¬",
-  "neg": "¬",
-  "!": "¬",
-  "impl": "→",
-  "->": "→",
-  "bic": "↔",
-  "and": "∧",
-  "&": "∧",
-  "*": "∧",
-  "or": "∨",
-  "+": "∨",
-  "bot": "⊥",
-  "\u200B": " ",
-};
-
-
-function replaceWithSymbols(input: string) {
-  let offset = -1;
-  for (const [token, replacement] of Object.entries(replacements)) {
-    // we obnly ever have one token at the time (I hope). calculate the offset and replace it
-    if (input.includes(token)) {
-      offset = token.length - 1;
-      return { result: input.replace(token, replacement), offset };
-    }
-  }
-  return { result: input, offset };
-}
 
 // when user types e.g. 'forall', replace it instantly with the proper forall unicode symbol, and
 // keep the user's cursor at the correct position so that user can continue typing.
@@ -611,7 +476,7 @@ function findNumberedLineUp(monacoLineNumber: number): number | null {
   let lineNumber = null;
   let monacoLineNumber2 = monacoLineNumber;
   while (!lineNumber && monacoLineNumber2 > 0) {
-    const line = model.getValue().split("\n")[monacoLineNumber2 - 1];
+    const line = editor.getModel().getValue().split("\n")[monacoLineNumber2 - 1];
     lineNumber = parseInt(line.split(" ")[0]);
     monacoLineNumber2 -= 1;
   }
@@ -621,10 +486,14 @@ function findNumberedLineUp(monacoLineNumber: number): number | null {
 }
 
 // Listen to content changes (fires on every keystroke)
-model.onDidChangeContent((_event: monaco.editor.IModelContentChangedEvent) => {
+editor.onDidChangeModelContent((_event: monaco.editor.IModelContentChangedEvent) => {
+  process_user_input();
+});
+editor.onDidChangeModel((_event) => {
   process_user_input();
 });
 
+// bottom bar
 document.getElementById("format-button").onclick = format;
 document.getElementById("latex-button").onclick = to_latex;
 document.getElementById("load-example-button").onclick = show_examples;
@@ -633,8 +502,11 @@ document.getElementById("download-button").onclick = download_proof;
 document.getElementById("upside-down-button").onclick = upside_down;
 document.getElementById("fix-line-numbers-button").onclick = fix_line_numbers;
 document.getElementById("allowed-variable-names").onkeyup = () => process_user_input();
-document.getElementById("settings-button").onclick =
-  toggle_show_advanced_settings;
+document.getElementById("settings-button").onclick = toggle_show_advanced_settings;
+
+// tab actions
+document.getElementById("file_open").onclick = openFile;
+document.getElementById("file_new").onclick = newFile;
 
 proofTargetEl.addEventListener("keyup", function(e) {
   const raw = (e.target as HTMLInputElement).value;
@@ -642,6 +514,16 @@ proofTargetEl.addEventListener("keyup", function(e) {
   proofTarget = replaced;
   proofTargetEl.value = replaced;
   confettiPlayed = false;
+});
+
+
+Alpine.start();
+
+
+Alpine.effect(() => {
+  const storeData = Alpine.store("tabs");
+  console.log("tab change", storeData.current);
+  editor.setModel(monaco.editor.getModels()[storeData.current]);
 });
 
 await init();

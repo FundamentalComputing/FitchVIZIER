@@ -17,6 +17,15 @@
 
   <div id="editor_wrapper">
     <div id="editor_container">
+      <!-- <button id="file_save">Save</button> -->
+      <div x-data class="flex gap-2">
+        <template x-for="(tab,i) in $store.tabs.files">
+          <button x-text="tab.name" class="p-2 cursor-pointer" @click="$store.tabs.current=i"
+            :class="$store.tabs.current==i ? 'bg-[#1e1e1e]' : ''"></button>
+        </template>
+        <button class="cursor-pointer" id="file_new">(new)</button>
+        <button class="cursor-pointer" id="file_open">(open)</button>
+      </div>
       <div style="position: relative;">
         <div id="editor"></div>
         <div class="absolute bottom-0 flex flex-wrap justify-between w-full px-4 pb-2 text-lg">
