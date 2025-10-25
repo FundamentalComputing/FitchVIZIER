@@ -150,7 +150,7 @@ async function openFile() {
 let newFileCounter = 1;
 function newFile(content?: string) {
   const uri = monaco.Uri.parse(`inmemory://new-${newFileCounter}.fitch`);
-  const model = monaco.editor.createModel(content || initContent, "fitch", uri);
+  const model = monaco.editor.createModel(content ?? initContent, "fitch", uri);
   const len = Alpine.store("tabs").files.push({ model, name: `new-${newFileCounter}.fitch` });
   Alpine.store("tabs").current = len - 1;
   newFileCounter++;
@@ -496,7 +496,7 @@ document.getElementById("settings-button").onclick = toggle_show_advanced_settin
 
 // tab actions
 document.getElementById("file_open").onclick = openFile;
-document.getElementById("file_new").onclick = newFile;
+document.getElementById("file_new").onclick = () => newFile();
 
 proofTargetEl.addEventListener("keyup", function(e) {
   const raw = (e.target as HTMLInputElement).value;
