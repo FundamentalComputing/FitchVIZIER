@@ -187,20 +187,15 @@ function closeTab(index: number) {
 window.closeTab = closeTab;
 
 async function loadFileIntoMonaco(file: File) {
-  // Read the file content
   const content = await file.text();
-  // Create a Monaco URI
   const uri = monaco.Uri.parse(`file:///${file.name}`);
-  // Check if a model already exists for this URI
   let model = monaco.editor.getModel(uri);
   if (model) {
-    // Update existing model
     model.setValue(content);
   } else {
-    // Create new model
     model = monaco.editor.createModel(
       content,
-      undefined, // language (auto-detected from file extension)
+      "fitch",
       uri
     );
   }
@@ -346,8 +341,6 @@ function insertNewline(
         999 | pos.column,
       ),
     );
-  } else {
-    console.log("selection not implemented");
   }
 }
 
@@ -360,17 +353,12 @@ export function process_user_input(firstRun = false) {
   const editorValue = editor.getValue();
   replace_words_by_fancy_symbols();
 
-  const allowedVariableNamesField = document.getElementById(
-    "allowed-variable-names",
-  );
+  const allowedVariableNamesField = document.getElementById("allowed-variable-names");
   if (!(allowedVariableNamesField instanceof HTMLInputElement)) {
     throw new Error(`allowed variable names field is of wrong node type`);
   }
 
-  const res = check_proof(
-    editor.getValue(),
-    allowedVariableNamesField.value,
-  );
+  const res = check_proof(editor.getValue(), allowedVariableNamesField.value);
   if (res.startsWith("The proof is correct!")) {
     document.getElementById("feedback").style.background = "green";
   } else if (res.startsWith("Fatal error")) {
@@ -393,11 +381,9 @@ export function process_user_input(firstRun = false) {
       },
     ];
     monaco.editor.setModelMarkers(model, "owner", markers);
-    // editor.setModelMarkers()
   } else {
     monaco.editor.setModelMarkers(model, "owner", []);
   }
-
 
   const lastLineNr = model.getFullModelRange().endLineNumber;
 
@@ -423,13 +409,11 @@ export function process_user_input(firstRun = false) {
       tsParticles.load(confettiConfig);
     }
   }
-
 }
 
 function format() {
   const formatted = format_proof(editor.getValue());
   if (formatted == "invalid") {
-    // alert("proof invalid cannot format");
     const feedbackEl = document.getElementById("feedback");
     feedbackEl.classList.remove("wiggle");
     feedbackEl.offsetHeight;
@@ -444,7 +428,6 @@ function format() {
     range: editor.getModel().getFullModelRange(),
     text: formatted,
   }]);
-  // selection.
   editor.setSelection(selection);
   // Move to end of current line
   editor.setPosition({
@@ -456,7 +439,6 @@ function format() {
 
 function fix_line_numbers() {
   const fixed = fix_line_numbers_in_proof(editor.getValue());
-
   editor.executeEdits("format-source", [{
     range: editor.getModel().getFullModelRange(),
     text: fixed,
@@ -497,7 +479,6 @@ function upside_down() {
   }
 }
 
-
 // when user types e.g. 'forall', replace it instantly with the proper forall unicode symbol, and
 // keep the user's cursor at the correct position so that user can continue typing.
 //
@@ -527,7 +508,7 @@ function download_proof() {
   const blob = new Blob([editor.getValue()], { type: "plain/text" });
   const fileUrl = URL.createObjectURL(blob);
   element.setAttribute("href", fileUrl);
-  element.setAttribute("download", "proof.txt");
+  element.setAttribute("download", Alpine.store("tabs").files[Alpine.store("tabs").current].name);
   element.style.display = "none";
   document.body.appendChild(element);
   element.click();
