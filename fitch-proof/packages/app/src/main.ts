@@ -170,7 +170,7 @@ function closeTab(index: number) {
     return;
   }
   if (current == index) { // if we close current tab, pick a new one
-    current = (current + 1 > files.length) ? current : current - 1;
+    current = (current + 1 > files.length) ? current : 0;
   } else {
     current--;
     if (current < 0) current = 0;
