@@ -109,6 +109,54 @@ editor.addCommand(monaco.KeyMod.Shift | monaco.KeyCode.Enter, function() {
   insertNewline(editor, true);
 });
 
+
+function saveToLocalStorage() {
+  const storeData = Alpine.store("tabs");
+  editor.setModel(monaco.editor.getModels()[storeData.current]);
+
+  // save to localstorage
+  if (!hasLoadedLocalStorage) {
+    hasLoadedLocalStorage = true;
+    return;
+  }
+  const data = storeData.files.map((file, index) => {
+    const content = monaco.editor.getModels()[index].getValue();
+
+    return { ...file, content };
+  });
+
+  localStorage.setItem("tabs", JSON.stringify({ files: data, current: storeData.current }));
+  console.log("saved!");
+}
+
+function loadFromLocalStorage() {
+  const importedData = JSON.parse(localStorage.getItem("tabs")) as TabsStore;
+  console.log(importedData);
+  if (importedData.current === undefined || !importedData.files) {
+    return;
+  }
+  console.log("data is in right format");
+  monaco.editor.getModels().forEach(m => m.dispose());
+  const newTabsData: TabsStore = { current: importedData.current, files: [] };
+  let highestNewFile = 1;
+  for (const tab of importedData.files) {
+    const uri = monaco.Uri.parse(`inmemory://${tab.name}`);
+    // @ts-ignore 
+    monaco.editor.createModel(tab.content, "fitch", uri);
+    newTabsData.files.push({ name: tab.name, confettiPlayed: tab.confettiPlayed, proofTarget: tab.proofTarget });
+
+    if (tab.name.startsWith("new-")) {
+      const n = parseInt(tab.name.slice(4));
+      if (n > highestNewFile) highestNewFile = n;
+    }
+  }
+
+  Alpine.store("tabs").current = newTabsData.current;
+  Alpine.store("tabs").files = newTabsData.files;
+  newFileCounter = highestNewFile + 1;
+  console.log("loaded tabs");
+}
+
 function closeTab(index: number) {
   let current = Alpine.store("tabs").current;
   const files = Alpine.store("tabs").files;
@@ -471,7 +519,7 @@ function findNumberedLineUp(monacoLineNumber: number): number | null {
 }
 
 // Listen to content changes (fires on every keystroke)
-editor.onDidChangeModelContent(() => process_user_input());
+editor.onDidChangeModelContent(() => { process_user_input(); saveToLocalStorage(); });
 editor.onDidChangeModel(() => process_user_input());
 
 // bottom bar
@@ -514,47 +562,13 @@ proofTargetEl.addEventListener("keyup", function(e) {
 
 let hasLoadedLocalStorage = false;
 Alpine.start();
+
+
 Alpine.effect(() => {
-  const storeData = Alpine.store("tabs");
-  editor.setModel(monaco.editor.getModels()[storeData.current]);
-
-  // save to localstorage
-  if (!hasLoadedLocalStorage) {
-    hasLoadedLocalStorage = true;
-    return;
-  }
-  const data = storeData.files.map((file) => {
-    const content = monaco.editor.getModels()[storeData.current].getValue();
-
-    return { ...file, content };
-  });
-
-  localStorage.setItem("tabs", JSON.stringify({ files: data, current: storeData.current }));
+  Alpine.store("tabs");
+  saveToLocalStorage();
 });
 
-function loadFromLocalStorage() {
-  const importedData = JSON.parse(localStorage.getItem("tabs")) as TabsStore;
-  if (!importedData.current || !importedData.files) {
-    return;
-  }
-  const newTabsData: TabsStore = { current: importedData.current, files: [] };
-  let highestNewFile = 1;
-  for (const tab of importedData.files) {
-    const uri = monaco.Uri.parse(`inmemory://${tab.name}`);
-    // @ts-ignore 
-    monaco.editor.createModel(tab.content, "fitch", uri);
-    newTabsData.files.push({ name: tab.name, confettiPlayed: tab.confettiPlayed, proofTarget: tab.proofTarget });
-
-    if (tab.name.startsWith("new-")) {
-      const n = parseInt(tab.name.slice(4));
-      if (n > highestNewFile) highestNewFile = n;
-    }
-  }
-
-  Alpine.store("tabs").current = newTabsData.current;
-  Alpine.store("tabs").files = newTabsData.files;
-  newFileCounter = highestNewFile + 1;
-}
 
 await init();
 loadFromLocalStorage();
