@@ -489,17 +489,23 @@ document.getElementById("settings-button").onclick = toggle_show_advanced_settin
 document.getElementById("file_open").onclick = openFile;
 document.getElementById("file_new").onclick = () => newFile();
 
-const proofTargetEl = document.getElementById("proof_target");
-proofTargetEl.addEventListener("keyup", function(e) {
-  const raw = (e.target as HTMLInputElement).value;
-  const replaced = replaceWithSymbols(raw).result;
-  // proofTarget = replaced;
-  // proofTargetEl.value = replaced;
-  const currentTab = Alpine.store("tabs").current;
-  Alpine.store("tabs").files[currentTab].proofTarget = replaced;
-  Alpine.store("tabs").files[currentTab].confettiPlayed = false;
-});
+const proofTargetEl = document.getElementById("proof_target") as HTMLInputElement;
 
+proofTargetEl.addEventListener("keyup", function(e) {
+  const input = e.target as HTMLInputElement;
+  const cursorPos = input.selectionStart;
+  const raw = input.value;
+  const x = replaceWithSymbols(raw);
+
+  proofTargetEl.value = x.result;
+
+  const currentTab = Alpine.store("tabs").current;
+  Alpine.store("tabs").files[currentTab].proofTarget = x.result;
+  Alpine.store("tabs").files[currentTab].confettiPlayed = false;
+
+  // Restore cursor position
+  input.setSelectionRange(cursorPos - x.offset, cursorPos - x.offset);
+});
 
 Alpine.start();
 Alpine.effect(() => {
@@ -507,5 +513,3 @@ Alpine.effect(() => {
   editor.setModel(monaco.editor.getModels()[storeData.current]);
 });
 
-await init();
-process_user_input(true);
