@@ -146,13 +146,29 @@ async function openFile() {
   }
 }
 
+
 let newFileCounter = 1;
-async function newFile() {
+function newFile(content?: string) {
   const uri = monaco.Uri.parse(`inmemory://new-${newFileCounter}.fitch`);
-  const model = monaco.editor.createModel(initContent, "fitch", uri);
+  const model = monaco.editor.createModel(content || initContent, "fitch", uri);
   const len = Alpine.store("tabs").files.push({ model, name: `new-${newFileCounter}.fitch` });
   Alpine.store("tabs").current = len - 1;
   newFileCounter++;
+}
+
+
+function load_random_excercise() {
+  const excercise = excercises[(Math.random() * excercises.length) | 0];
+  proofTarget = excercise.conclusion;
+  proofTargetEl.value = proofTarget;
+  confettiPlayed = false;
+
+  let assumptionsCompiled = "";
+  for (let i = 0; i < excercise.assumptions.length; i++) {
+    assumptionsCompiled += `${i + 1} | ${excercise.assumptions[i]}\n`;
+  }
+  assumptionsCompiled += "  |----";
+  newFile(assumptionsCompiled);
 }
 
 function insertPipe(editor: monaco.editor.IStandaloneCodeEditor) {
@@ -393,35 +409,9 @@ function show_examples() {
   document.getElementById("additional-examples").hidden = !examples_are_visible;
 }
 export function load_example(index: number) {
-  let rdy = editor.getModel().getValue() == "";
-  if (!rdy) {
-    rdy = confirm(
-      "Your proof area is not empty. Loading an example will overwrite your current proof. Are you sure you want to continue?",
-    );
-  }
-  if (rdy) {
-    editor.setValue(examples[index]);
-    process_user_input();
-  }
+  newFile(examples[index]);
 }
-
 window.load_example = load_example;
-
-function load_random_excercise() {
-  const excercise = excercises[(Math.random() * excercises.length) | 0];
-  proofTarget = excercise.conclusion;
-  proofTargetEl.value = proofTarget;
-  confettiPlayed = false;
-
-  let assumptionsCompiled = "";
-  for (let i = 0; i < excercise.assumptions.length; i++) {
-    assumptionsCompiled += `${i + 1} | ${excercise.assumptions[i]}\n`;
-  }
-  assumptionsCompiled += "  |----";
-  // todo: open in new tab
-  editor.getModel().setValue(assumptionsCompiled);
-
-}
 
 let proof_is_upside_down = false;
 function upside_down() {
