@@ -13,18 +13,20 @@ import * as monaco from "monaco-editor";
 import { tsParticles } from "@tsparticles/engine";
 import "@tsparticles/preset-confetti";
 import { loadConfettiPreset } from '@tsparticles/preset-confetti';
-// import MonacoErrorLens, { type MonacoEditor } from "@ym-han/monaco-error-lens";
 import examples from "./examples.ts";
 import excercises from "./excercises.ts";
 
 import Alpine from 'alpinejs';
 import { languagedef, theme } from "./languagedef.ts";
-import { getEditorLineNumber, getFile, getLineByMonacoNumber, getLineDepth, getLineType, isFitchBar, replaceWithSymbols } from "./helpers.ts";
+import {
+  getEditorLineNumber, getFile, getLineByMonacoNumber, getLineDepth,
+  getLineType, isFitchBar, replaceWithSymbols
+} from "./helpers.ts";
 import { confettiConfig } from "./confetti.ts";
 // window.Alpine = Alpine;
 
 interface TabsStore {
-  files: { model: monaco.editor.IModel, name: string }[];
+  files: { name: string, proofTarget: string, confettiPlayed: boolean }[];
   current: number;
 }
 
@@ -43,7 +45,7 @@ const initModel = monaco.editor.createModel(initContent, "fitch", uri);
 
 Alpine.store('tabs', {
   current: 0,
-  files: [{ model: initModel, name: 'new.fitch' }],
+  files: [{ name: 'new.fitch', proofTarget: "", confettiPlayed: false }],
 });
 
 
@@ -55,9 +57,6 @@ declare global {
   }
 }
 
-const proofTargetEl = document.getElementById("proof_target") as HTMLInputElement;
-let proofTarget = proofTargetEl.value;
-let confettiPlayed = false;
 loadConfettiPreset(tsParticles);
 
 monaco.languages.register({
@@ -110,32 +109,6 @@ editor.addCommand(monaco.KeyMod.Shift | monaco.KeyCode.Enter, function() {
   insertNewline(editor, true);
 });
 
-
-async function loadFileIntoMonaco(file: File) {
-  // Read the file content
-  const content = await file.text();
-
-  // Create a Monaco URI
-  const uri = monaco.Uri.parse(`file:///${file.name}`);
-
-  // Check if a model already exists for this URI
-  let model = monaco.editor.getModel(uri);
-
-  if (model) {
-    // Update existing model
-    model.setValue(content);
-  } else {
-    // Create new model
-    model = monaco.editor.createModel(
-      content,
-      undefined, // language (auto-detected from file extension)
-      uri
-    );
-  }
-
-  return model;
-}
-
 function closeTab(index: number) {
   let current = Alpine.store("tabs").current;
   const files = Alpine.store("tabs").files;
@@ -162,9 +135,7 @@ window.closeTab = closeTab;
 async function openFile() {
   const file = await getFile();
   if (file) {
-    const model = await loadFileIntoMonaco(file);
-    // editor.setModel(model);
-    const len = Alpine.store("tabs").files.push({ model, name: file.name });
+    const len = Alpine.store("tabs").files.push({ proofTarget: "", confettiPlayed: false, name: file.name });
     Alpine.store("tabs").current = len - 1;
   }
 }
@@ -173,8 +144,10 @@ async function openFile() {
 let newFileCounter = 1;
 function newFile(content?: string) {
   const uri = monaco.Uri.parse(`inmemory://new-${newFileCounter}.fitch`);
-  const model = monaco.editor.createModel(content ?? initContent, "fitch", uri);
-  const len = Alpine.store("tabs").files.push({ model, name: `new-${newFileCounter}.fitch` });
+  monaco.editor.createModel(content ?? initContent, "fitch", uri);
+  const len = Alpine.store("tabs").files.push({
+    name: `new-${newFileCounter}.fitch`, proofTarget: "", confettiPlayed: false
+  });
   Alpine.store("tabs").current = len - 1;
   newFileCounter++;
 }
@@ -182,9 +155,6 @@ function newFile(content?: string) {
 
 function load_random_excercise() {
   const excercise = excercises[(Math.random() * excercises.length) | 0];
-  proofTarget = excercise.conclusion;
-  proofTargetEl.value = proofTarget;
-  confettiPlayed = false;
 
   let assumptionsCompiled = "";
   for (let i = 0; i < excercise.assumptions.length; i++) {
@@ -192,6 +162,7 @@ function load_random_excercise() {
   }
   assumptionsCompiled += "  |----";
   newFile(assumptionsCompiled);
+  Alpine.store("tabs").files[Alpine.store("tabs").current].proofTarget = excercise.conclusion;
 }
 
 function insertPipe(editor: monaco.editor.IStandaloneCodeEditor) {
@@ -362,14 +333,15 @@ export function process_user_input(firstRun = false) {
   }
 
   // check if proof target was reached
+  const tab = Alpine.store("tabs").files[Alpine.store("tabs").current];
   const checkRes: string = check_proof_with_template(
     model.getValue(),
-    [...premises, proofTarget],
+    [...premises, tab.proofTarget],
     allowedVariableNamesField.value
   );
 
-  if (checkRes.includes('correct') && !confettiPlayed) {
-    confettiPlayed = true;
+  if (checkRes.includes('correct') && !tab.confettiPlayed) {
+    tab.confettiPlayed = true;
     if (!firstRun) {
       tsParticles.load(confettiConfig);
     }
@@ -462,15 +434,13 @@ function replace_words_by_fancy_symbols() {
   }
 
   const pos = editor.getPosition();
-
   editor.executeEdits("format-source", [{
     range: editor.getModel().getFullModelRange(),
     text: proofstr,
   }]);
 
   setTimeout(() => {
-    const newPos = pos.with(undefined, pos.column - (offset - 1));
-    editor.setPosition(newPos);
+    editor.setPosition(pos.with(undefined, pos.column - (offset - 1)));
   }, 1);
 }
 
@@ -501,12 +471,8 @@ function findNumberedLineUp(monacoLineNumber: number): number | null {
 }
 
 // Listen to content changes (fires on every keystroke)
-editor.onDidChangeModelContent((_event: monaco.editor.IModelContentChangedEvent) => {
-  process_user_input();
-});
-editor.onDidChangeModel((_event) => {
-  process_user_input();
-});
+editor.onDidChangeModelContent(() => process_user_input());
+editor.onDidChangeModel(() => process_user_input());
 
 // bottom bar
 document.getElementById("format-button").onclick = format;
@@ -523,17 +489,19 @@ document.getElementById("settings-button").onclick = toggle_show_advanced_settin
 document.getElementById("file_open").onclick = openFile;
 document.getElementById("file_new").onclick = () => newFile();
 
+const proofTargetEl = document.getElementById("proof_target");
 proofTargetEl.addEventListener("keyup", function(e) {
   const raw = (e.target as HTMLInputElement).value;
   const replaced = replaceWithSymbols(raw).result;
-  proofTarget = replaced;
-  proofTargetEl.value = replaced;
-  confettiPlayed = false;
+  // proofTarget = replaced;
+  // proofTargetEl.value = replaced;
+  const currentTab = Alpine.store("tabs").current;
+  Alpine.store("tabs").files[currentTab].proofTarget = replaced;
+  Alpine.store("tabs").files[currentTab].confettiPlayed = false;
 });
 
 
 Alpine.start();
-
 Alpine.effect(() => {
   const storeData = Alpine.store("tabs");
   editor.setModel(monaco.editor.getModels()[storeData.current]);

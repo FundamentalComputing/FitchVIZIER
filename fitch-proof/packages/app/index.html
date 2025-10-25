@@ -36,9 +36,10 @@
       </div>
       <div style="position: relative;" class="relative border-x-1 border-gray-700">
         <div id="editor"></div>
-        <div class="absolute bottom-0 flex flex-wrap justify-between w-full px-4 pb-2 text-lg">
+        <div class="absolute bottom-0 flex flex-wrap justify-between w-full px-4 pb-2 text-lg" x-data>
           <div class="flex-grow text-nowrap pr-4"><span>🏁 </span><input type="text" class="flex-grow w-full"
-              placeholder="What do you want to prove?" id='proof_target'>
+              placeholder="What do you want to prove?" id='proof_target'
+              x-model="$store.tabs.files[$store.tabs.current].proofTarget">
           </div>
           <div id="typing-guide2" class="">
             <!-- Typing guide: -->
