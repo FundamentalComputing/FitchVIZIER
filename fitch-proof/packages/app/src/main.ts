@@ -494,6 +494,10 @@ const proofTargetEl = document.getElementById("proof_target") as HTMLInputElemen
 proofTargetEl.addEventListener("keyup", function(e) {
   const input = e.target as HTMLInputElement;
   const cursorPos = input.selectionStart;
+  const cursorPosEnd = input.selectionEnd;
+  if (cursorPosEnd != cursorPos) {
+    return;
+  }
   const raw = input.value;
   const x = replaceWithSymbols(raw);
 
@@ -504,7 +508,8 @@ proofTargetEl.addEventListener("keyup", function(e) {
   Alpine.store("tabs").files[currentTab].confettiPlayed = false;
 
   // Restore cursor position
-  input.setSelectionRange(cursorPos - x.offset, cursorPos - x.offset);
+  const newPos = x.offset == -1 ? cursorPos : cursorPos - x.offset;
+  input.setSelectionRange(newPos, newPos);
 });
 
 Alpine.start();
