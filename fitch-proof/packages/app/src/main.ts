@@ -23,6 +23,17 @@ import {
   getLineType, isFitchBar, replaceWithSymbols
 } from "./helpers.ts";
 import { confettiConfig } from "./confetti.ts";
+
+
+declare global {
+  interface Window {
+    editor: monaco.editor.IStandaloneCodeEditor;
+    load_example: (index: number) => void;
+    closeTab: (index: number) => void;
+    Alpine: Alpine.Alpine
+  }
+}
+
 window.Alpine = Alpine;
 
 interface TabsStore {
@@ -48,14 +59,6 @@ Alpine.store('tabs', {
   files: [{ name: 'new.txt', proofTarget: "", confettiPlayed: false, uri }],
 });
 
-
-declare global {
-  interface Window {
-    editor: monaco.editor.IStandaloneCodeEditor;
-    load_example: (index: number) => void;
-    closeTab: (index: number) => void;
-  }
-}
 
 loadConfettiPreset(tsParticles);
 
