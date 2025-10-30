@@ -23,7 +23,7 @@ import {
   getLineType, isFitchBar, replaceWithSymbols
 } from "./helpers.ts";
 import { confettiConfig } from "./confetti.ts";
-// window.Alpine = Alpine;
+window.Alpine = Alpine;
 
 interface TabsStore {
   files: { name: string, uri: monaco.Uri, proofTarget: string, confettiPlayed: boolean }[];
@@ -112,7 +112,6 @@ editor.addCommand(monaco.KeyMod.Shift | monaco.KeyCode.Enter, function() {
 
 function saveToLocalStorage() {
   const storeData = Alpine.store("tabs");
-  editor.setModel(monaco.editor.getModels()[storeData.current]);
 
   // save to localstorage
   if (!hasLoadedLocalStorage) {
@@ -125,19 +124,20 @@ function saveToLocalStorage() {
     return { ...file, content, uri: file.uri.toString() };
   });
 
-  localStorage.setItem("tabs", JSON.stringify({ files: data, current: storeData.current }));
+  localStorage.setItem("tabs", JSON.stringify({ files: data }));
+  // editor.setModel(monaco.editor.getModels()[storeData.current]);
   console.log("saved!");
 }
 
 function loadFromLocalStorage() {
-  const importedData = JSON.parse(localStorage.getItem("tabs")) as TabsStore;
+  const importedData = JSON.parse(localStorage.getItem("tabs")) as Omit<TabsStore, 'current'>;
   console.log(importedData);
-  if (importedData.current === undefined || !importedData.files) {
+  if (!importedData.files) {
     return;
   }
   console.log("data is in right format");
   monaco.editor.getModels().forEach(m => m.dispose());
-  const newTabsData: TabsStore = { current: importedData.current, files: [] };
+  const newTabsData: TabsStore = { current: 0, files: [] };
   let highestNewFile = 1;
   for (const tab of importedData.files) {
     // @ts-ignore
@@ -157,29 +157,24 @@ function loadFromLocalStorage() {
     }
   }
 
-  Alpine.store("tabs").current = newTabsData.current;
+  if (newTabsData.current >= newTabsData.files.length - 1) {
+    Alpine.store("tabs").current = 0;
+
+    console.log('reset to 0');
+  }
   Alpine.store("tabs").files = newTabsData.files;
   newFileCounter = highestNewFile + 1;
   console.log("loaded tabs");
 }
 
 function closeTab(index: number) {
-  let current = Alpine.store("tabs").current;
   const files = Alpine.store("tabs").files;
   if (files.length < 2) {
     return;
   }
-  if (current == index) { // if we close current tab, pick a new one
-    current = (current + 1 > files.length) ? current : 0;
-  } else {
-    current--;
-    if (current < 0) current = 0;
-  }
   Alpine.store("tabs").files.splice(index, 1);
-  Alpine.store("tabs").current = current;
+  Alpine.store("tabs").current = 0;
 
-  const model = monaco.editor.getModel(files[current].uri);
-  editor.setModel(model);
   setTimeout(() => { // it errors without this and im too tired to fix it properly
     monaco.editor.getModels()[index].dispose();
   }, 100);
@@ -529,8 +524,12 @@ function findNumberedLineUp(monacoLineNumber: number): number | null {
 }
 
 // Listen to content changes (fires on every keystroke)
-editor.onDidChangeModelContent(() => { process_user_input(); saveToLocalStorage(); });
-editor.onDidChangeModel(() => process_user_input());
+editor.onDidChangeModelContent(() => {
+  process_user_input();
+  saveToLocalStorage();
+
+});
+editor.onDidChangeModel(() => editor.getModel() && process_user_input());
 
 // bottom bar
 document.getElementById("format-button").onclick = format;
@@ -575,11 +574,21 @@ Alpine.start();
 
 
 Alpine.effect(() => {
-  Alpine.store("tabs");
+  Alpine.store("tabs").files;
   saveToLocalStorage();
 });
 
 
+Alpine.effect(() => {
+  const current = Alpine.store("tabs").current;
+  editor.setModel(monaco.editor.getModels()[current]);
+});
+
+
 await init();
+window.addEventListener('storage', (e: StorageEvent) => loadFromLocalStorage(), false);
 loadFromLocalStorage();
+const current = Alpine.store("tabs").current;
+editor.setModel(monaco.editor.getModels()[current]);
+
 process_user_input(true);
