@@ -589,7 +589,7 @@ Alpine.effect(() => {
 
 
 await init();
-window.addEventListener('storage', (e: StorageEvent) => loadFromLocalStorage(), false);
+window.addEventListener('storage', () => loadFromLocalStorage(), false);
 loadFromLocalStorage();
 const current = Alpine.store("tabs").current;
 editor.setModel(monaco.editor.getModels()[current]);
