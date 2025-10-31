@@ -3,24 +3,18 @@ use std::io::Write;
 use std::path::Path;
 use std::process::{Command, Stdio};
 
-
 // Integration tests are set up as follows:
 //  in the test_cases directory each test corresponds to 2 or 3 files:
 //      - test_X.txt           the proof itself
 //      - test_X.template      template to check against  [optional]
 //      - test_X.expected      the expected output of the test
 
-
-#[test]
-fn run_integration_tests() {
-    let cli_path = env!("CARGO_BIN_EXE_cli");
-    let test_cases_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/test_cases");
-
-    for entry in fs::read_dir(test_cases_dir).expect("Failed to read test_cases directory") {
+fn run_tests_in_dir(cli_path: &str, dir: &Path) {
+    for entry in fs::read_dir(dir).unwrap_or_else(|e| panic!("Failed to read test directory {:?}: {}", dir, e)) {
         let entry = entry.expect("Failed to read directory entry");
         let path = entry.path();
 
-        if path.extension().and_then(|s| s.to_str()) == Some("txt") {
+        if path.is_file() && path.extension().and_then(|s| s.to_str()) == Some("txt") {
             let proof_file = path.to_str().unwrap();
             let stem = path.file_stem().unwrap().to_str().unwrap();
             println!("Running test for: {}", stem);
@@ -51,7 +45,7 @@ fn run_integration_tests() {
 
             if use_template {
                 let template_content = fs::read_to_string(&template_file)
-                    .expect(&format!("Failed to read template file: {:?}", template_file));
+                    .unwrap_or_else(|e| panic!("Failed to read template file: {:?}: {}", template_file, e));
                 let mut stdin = child.stdin.take().expect("Failed to open stdin");
                 stdin.write_all(template_content.as_bytes()).expect("Failed to write to stdin");
             }
@@ -65,9 +59,24 @@ fn run_integration_tests() {
             }
 
             let expected_output = fs::read_to_string(&expected_file)
-                .expect(&format!("Failed to read expected file: {:?}", expected_file));
+                .unwrap_or_else(|e| panic!("Failed to read expected file: {:?}: {}", expected_file, e));
 
             assert_eq!(stdout.trim(), expected_output.trim(), "Test failed for {}", stem);
         }
+    }
+}
+
+#[test]
+fn run_integration_tests() {
+    let cli_path = env!("CARGO_BIN_EXE_cli");
+    let base_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/test_cases");
+    
+    // Run tests in the main test_cases directory, which contains passing tests
+    run_tests_in_dir(cli_path, &base_dir);
+
+    // Run tests in the failing subdirectory
+    let failing_dir = base_dir.join("failing");
+    if failing_dir.is_dir() {
+        run_tests_in_dir(cli_path, &failing_dir);
     }
 }
