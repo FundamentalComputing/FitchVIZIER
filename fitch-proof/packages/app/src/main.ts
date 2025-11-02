@@ -30,6 +30,7 @@ declare global {
     editor: monaco.editor.IStandaloneCodeEditor;
     load_example: (index: number) => void;
     closeTab: (index: number) => void;
+    renameTab: (index: number) => void;
     Alpine: Alpine.Alpine
   }
 }
@@ -180,9 +181,24 @@ function closeTab(index: number) {
 
   setTimeout(() => { // it errors without this and im too tired to fix it properly
     monaco.editor.getModels()[index].dispose();
+    editor.setModel(monaco.editor.getModels()[0]);
   }, 100);
 }
 window.closeTab = closeTab;
+
+function renameTab(index: number) {
+  const files = Alpine.store("tabs").files;
+  const oldName = files[index].name;
+  const newName = prompt('enter new name', oldName);
+  if (!newName) return;
+  if (newName == oldName) return;
+  if (files.find(f => f.name == newName)) {
+    alert("File already exists");
+    return;
+  }
+  files[index].name = newName;
+}
+window.renameTab = renameTab;
 
 async function loadFileIntoMonaco(file: File) {
   const content = await file.text();

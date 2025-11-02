@@ -23,7 +23,8 @@
           <div class="flex p-2 group border-solid border-gray-700 border-1"
             :class="($store.tabs.current==i ? 'bg-[#1e1e1e] border-b-0' : '') + (i == $store.tabs.files.length - 1 ? ' border-r-1' : ' border-r-0')"
             :class="">
-            <button x-text="tab.name" class="cursor-pointer" @click="$store.tabs.current=i"></button>
+            <button x-text="tab.name" class="cursor-pointer"
+              @click="$store.tabs.current==i ? renameTab(i) : $store.tabs.current=i"></button>
             <button x-show="$store.tabs.files.length > 1" class="pl-2 cursor-pointer opacity-0 group-hover:opacity-90"
               :class="$store.tabs.current==i ? 'opacity-90' : ''" @click="closeTab(i)">x</button>
           </div>
