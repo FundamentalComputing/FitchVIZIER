@@ -13,135 +13,69 @@ import * as monaco from "monaco-editor";
 import { tsParticles } from "@tsparticles/engine";
 import "@tsparticles/preset-confetti";
 import { loadConfettiPreset } from '@tsparticles/preset-confetti';
-// import MonacoErrorLens, { type MonacoEditor } from "@ym-han/monaco-error-lens";
 import examples from "./examples.ts";
 import excercises from "./excercises.ts";
+
+import Alpine from 'alpinejs';
+import { languagedef, theme } from "./languagedef.ts";
+import {
+  getEditorLineNumber, getFile, getLineByMonacoNumber, getLineDepth,
+  getLineType, isFitchBar, replaceWithSymbols
+} from "./helpers.ts";
+import { confettiConfig } from "./confetti.ts";
 
 
 declare global {
   interface Window {
     editor: monaco.editor.IStandaloneCodeEditor;
     load_example: (index: number) => void;
+    closeTab: (index: number) => void;
+    renameTab: (index: number) => void;
+    Alpine: Alpine.Alpine
   }
 }
 
-const proofTargetEl = document.getElementById("proof_target") as HTMLInputElement;
-let proofTarget = proofTargetEl.value;
-let confettiPlayed = false;
+window.Alpine = Alpine;
+
+interface TabsStore {
+  files: { name: string, uri: monaco.Uri, proofTarget: string, confettiPlayed: boolean }[];
+  current: number;
+}
+
+// Extend Alpine's Stores interface
+declare module 'alpinejs' {
+  interface Stores {
+    tabs: TabsStore;
+  }
+}
+
+const initContent = `1 | A
+  |----
+2 | A           Reit: 1`;
+const uri = monaco.Uri.parse("inmemory://test");
+const initModel = monaco.editor.createModel(initContent, "fitch", uri);
+
+Alpine.store('tabs', {
+  current: 0,
+  files: [{ name: 'new.txt', proofTarget: "", confettiPlayed: false, uri }],
+});
+
+
 loadConfettiPreset(tsParticles);
 
 monaco.languages.register({
   id: "fitch",
   extensions: [".fitch", ".txt"],
   aliases: ["Fitch Proof", "fitch"],
-  mimetypes: ["text/fitch"],
+  mimetypes: ["text/plain"],
 });
 
-// Define the syntax highlighting rules
-monaco.languages.setMonarchTokensProvider("fitch", {
-  tokenizer: {
-    root: [
-      // Line numbers at start
-      [/^\s*\d+/, "line-number"],
-
-      // Proof structure - vertical bars and dashes
-      [/\s*\|\s*/, "proof-structure"],
-      [/\s*-+\s*/, "proof-structure"],
-
-      // Logical operators and symbols
-      [/∧/, "operator.conjunction"],
-      [/∨/, "operator.disjunction"],
-      [/¬/, "operator.negation"],
-      [/→/, "operator.implication"],
-      [/↔/, "operator.biconditional"],
-      [/∀/, "quantifier.universal"],
-      [/∃/, "quantifier.existential"],
-      [/⊥/, "operator.falsum"],
-      [/⊤/, "operator.verum"],
-      [/=/, "operator.equality"],
-      [/≠/, "operator.inequality"],
-
-      // Parentheses and brackets
-      [/[()[\]{}]/, "delimiter"],
-
-      // Predicate/function names (capital letters)
-      [/[A-Z][a-zA-Z0-9]*/, "predicate"],
-
-      // Variables and constants (lowercase)
-      [/[a-z][a-zA-Z0-9]*/, "variable"],
-
-      // Function applications like f(a), g(x,y)
-      [/[a-z]+(?=\()/, "function"],
-
-      // Justifications - rule names
-      [
-        /\b(Reit|∧\s*Elim|∨\s*Elim|∧\s*Intro|∨\s*Intro|→\s*Elim|→\s*Intro|¬\s*Elim|¬\s*Intro|=\s*Elim|=\s*Intro|∀\s*Elim|∀\s*Intro|∃\s*Elim|∃\s*Intro|⊥\s*Elim|RAA|MT|DS|HS|Add|Simp|Conj|MP|DeM|DN|Com|Assoc|Dist|Exp|Equiv|Impl|Taut|Contra)\b/,
-        "rule-name",
-      ],
-
-      // Line references in justifications (numbers, ranges)
-      [/:\s*\d+/, "justification.reference"],
-      [/\d+-\d+/, "justification.reference"],
-      [/,\s*\d+/, "justification.reference"],
-
-      // Comma separator
-      [/,/, "delimiter"],
-
-      // Whitespace
-      [/\s+/, "white"],
-    ],
-  },
-});
-
-// Define the color theme
-monaco.editor.defineTheme("fitch-theme", {
-  base: "vs-dark",
-  inherit: true,
-  rules: [
-    { token: "line-number", foreground: "888888", fontStyle: "bold" },
-    { token: "proof-structure", foreground: "888888" },
-    { token: "operator.conjunction", foreground: "CC6666", fontStyle: "bold" },
-    { token: "operator.disjunction", foreground: "CC6666", fontStyle: "bold" },
-    { token: "operator.negation", foreground: "CC6666", fontStyle: "bold" },
-    { token: "operator.implication", foreground: "CC6666", fontStyle: "bold" },
-    {
-      token: "operator.biconditional",
-      foreground: "CC6666",
-      fontStyle: "bold",
-    },
-    { token: "operator.falsum", foreground: "FF4444", fontStyle: "bold" },
-    { token: "operator.verum", foreground: "44FF44", fontStyle: "bold" },
-    { token: "operator.equality", foreground: "CC6666", fontStyle: "bold" },
-    { token: "operator.inequality", foreground: "CC6666", fontStyle: "bold" },
-    { token: "quantifier.universal", foreground: "9966CC", fontStyle: "bold" },
-    {
-      token: "quantifier.existential",
-      foreground: "9966CC",
-      fontStyle: "bold",
-    },
-    { token: "predicate", foreground: "99CC99" },
-    { token: "function", foreground: "CCCC66" },
-    { token: "variable", foreground: "99CCFF" },
-    { token: "rule-name", foreground: "FF9966", fontStyle: "italic" },
-    { token: "justification.reference", foreground: "CCCCCC" },
-    { token: "delimiter", foreground: "#87875f" },
-  ],
-  colors: {
-    "editor.background": "#1e1e1e",
-  },
-});
-
-const value = `1 | A
-  |----
-2 | A           Reit: 1`;
-const uri = monaco.Uri.parse("inmemory://test");
-const model = monaco.editor.createModel(value, "fitch", uri);
+// Define the syntax highlighting rules and color theme
+monaco.languages.setMonarchTokensProvider("fitch", languagedef);
+monaco.editor.defineTheme("fitch-theme", theme);
 
 const editor = monaco.editor.create(document.getElementById("editor"), {
-  //   value: `1 | A
-  //   |----
-  // 2 | A           Reit: 1`,
-  model,
+  model: initModel,
   language: "fitch",
   theme: "fitch-theme",
   lineNumbers: "off",
@@ -156,6 +90,7 @@ const editor = monaco.editor.create(document.getElementById("editor"), {
   },
 });
 window.editor = editor;
+
 
 editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, function() {
   format();
@@ -178,13 +113,151 @@ editor.addCommand(monaco.KeyMod.Shift | monaco.KeyCode.Enter, function() {
   insertNewline(editor, true);
 });
 
+
+function saveToLocalStorage() {
+  const storeData = Alpine.store("tabs");
+
+  // save to localstorage
+  if (!hasLoadedLocalStorage) {
+    hasLoadedLocalStorage = true;
+    return;
+  }
+  const data = storeData.files.map((file) => {
+    const content = monaco.editor.getModel(file.uri).getValue();
+
+    return { ...file, content, uri: file.uri.toString() };
+  });
+
+  localStorage.setItem("tabs", JSON.stringify({ files: data }));
+  // editor.setModel(monaco.editor.getModels()[storeData.current]);
+  console.log("saved!");
+}
+
+function loadFromLocalStorage() {
+  const importedData = JSON.parse(localStorage.getItem("tabs")) as Omit<TabsStore, 'current'>;
+  console.log(importedData);
+  if (!importedData.files) {
+    return;
+  }
+  console.log("data is in right format");
+  monaco.editor.getModels().forEach(m => m.dispose());
+  const newTabsData: TabsStore = { current: 0, files: [] };
+  let highestNewFile = 1;
+  for (const tab of importedData.files) {
+    // @ts-ignore
+    const uri = monaco.Uri.parse(tab.uri);
+    // @ts-ignore 
+    monaco.editor.createModel(tab.content, "fitch", uri);
+    newTabsData.files.push({
+      name: tab.name,
+      confettiPlayed: tab.confettiPlayed,
+      proofTarget: tab.proofTarget,
+      uri
+    });
+
+    if (tab.name.startsWith("new-")) {
+      const n = parseInt(tab.name.slice(4));
+      if (n > highestNewFile) highestNewFile = n;
+    }
+  }
+
+  if (newTabsData.current >= newTabsData.files.length - 1) {
+    Alpine.store("tabs").current = 0;
+
+    console.log('reset to 0');
+  }
+  Alpine.store("tabs").files = newTabsData.files;
+  newFileCounter = highestNewFile + 1;
+  console.log("loaded tabs");
+}
+
+function closeTab(index: number) {
+  const files = Alpine.store("tabs").files;
+  if (files.length < 2) {
+    return;
+  }
+  Alpine.store("tabs").files.splice(index, 1);
+  Alpine.store("tabs").current = 0;
+
+  setTimeout(() => { // it errors without this and im too tired to fix it properly
+    monaco.editor.getModels()[index].dispose();
+    editor.setModel(monaco.editor.getModels()[0]);
+  }, 100);
+}
+window.closeTab = closeTab;
+
+function renameTab(index: number) {
+  const files = Alpine.store("tabs").files;
+  const oldName = files[index].name;
+  const newName = prompt('enter new name', oldName);
+  if (!newName) return;
+  if (newName == oldName) return;
+  if (files.find(f => f.name == newName)) {
+    alert("File already exists");
+    return;
+  }
+  files[index].name = newName;
+}
+window.renameTab = renameTab;
+
+async function loadFileIntoMonaco(file: File) {
+  const content = await file.text();
+  const uri = monaco.Uri.parse(`file:///${file.name}`);
+  let model = monaco.editor.getModel(uri);
+  if (model) {
+    model.setValue(content);
+  } else {
+    model = monaco.editor.createModel(
+      content,
+      "fitch",
+      uri
+    );
+  }
+  return uri;
+}
+
+async function openFile() {
+  const file = await getFile();
+  if (file) {
+    const uri = await loadFileIntoMonaco(file);
+    const len = Alpine.store("tabs").files.push({ proofTarget: "", confettiPlayed: false, name: file.name, uri });
+    Alpine.store("tabs").current = len - 1;
+  }
+  saveToLocalStorage();
+}
+
+
+let newFileCounter = 1;
+function newFile(content?: string) {
+  const uri = monaco.Uri.parse(`inmemory://new-${newFileCounter}.txt`);
+  monaco.editor.createModel(content ?? initContent, "fitch", uri);
+  const len = Alpine.store("tabs").files.push({
+    name: `new-${newFileCounter}.txt`, proofTarget: "", confettiPlayed: false, uri
+  });
+  Alpine.store("tabs").current = len - 1;
+  newFileCounter++;
+}
+
+
+function load_random_excercise() {
+  const excercise = excercises[(Math.random() * excercises.length) | 0];
+
+  let assumptionsCompiled = "";
+  for (let i = 0; i < excercise.assumptions.length; i++) {
+    assumptionsCompiled += `${i + 1} | ${excercise.assumptions[i]}\n`;
+  }
+  assumptionsCompiled += "  |----";
+  newFile(assumptionsCompiled);
+  Alpine.store("tabs").files[Alpine.store("tabs").current].proofTarget = excercise.conclusion;
+}
+
 function insertPipe(editor: monaco.editor.IStandaloneCodeEditor) {
   const selection = editor.getSelection();
   // const model = editor.getModel();
 
   if (selection.isEmpty()) {
     const position = editor.getPosition();
-    const lineContent = model.getLineContent(position.lineNumber);
+    const lineContent = editor.getModel().getLineContent(position.lineNumber);
 
     const column = lineContent.length - lineContent.split("").reverse().findIndex((v) => v == '|');
 
@@ -229,33 +302,6 @@ function removePipe(editor: monaco.editor.IStandaloneCodeEditor) {
   }
 }
 
-function getLineByMonacoNumber(monacoLineNr: number) {
-  return model.getValue().split("\n")[monacoLineNr - 1];
-}
-
-function getLineDepth(line: string) {
-  return line ? line.split("|").length - 1 : 1;
-}
-
-function isFitchBar(line: string) {
-  return line.includes("|-");
-}
-
-function getLineType(moncaoLineNr: number) {
-  let currentLineNr = moncaoLineNr;
-  const initialLine = getLineByMonacoNumber(currentLineNr);
-  const initialDepth = getLineDepth(initialLine);
-  if (isFitchBar(initialLine)) return "fitchbar";
-  while (currentLineNr > 0) {
-    const line = getLineByMonacoNumber(currentLineNr);
-    const depth = getLineDepth(line);
-    if (depth < initialDepth) return "premise";
-    if (depth > initialDepth) return "conclusion";
-    if (isFitchBar(line) && depth == initialDepth) return "conclusion";
-    currentLineNr--;
-  }
-  return "premise";
-}
 
 function insertNewline(
   editor: monaco.editor.IStandaloneCodeEditor,
@@ -269,9 +315,9 @@ function insertNewline(
     const pos = editor.getPosition();
     let lineNumber = findNumberedLineUp(pos.lineNumber);
     if (!lineNumber) lineNumber = 0;
-    const line = getLineByMonacoNumber(pos.lineNumber);
+    const line = getLineByMonacoNumber(editor.getValue(), pos.lineNumber);
     const depth = getLineDepth(line);
-    const lineType = getLineType(pos.lineNumber);
+    const lineType = getLineType(editor.getValue(), pos.lineNumber);
 
     let text = `\n${lineNumber + 1} ${"| ".repeat(depth)}`;
 
@@ -309,53 +355,24 @@ function insertNewline(
         999 | pos.column,
       ),
     );
-  } else {
-    console.log("selection not implemented");
   }
 }
 
-// Create Error Lens instance
-// const errorLens = new MonacoErrorLens(editor, monaco, {
-//   enabled: false,
-//   enableInlineMessages: true,
-//   enableLineHighlights: true,
-//   enableGutterIcons: true,
-//   followCursor: "allLines", // Only show diagnostics for current line
-//   // messageTemplate: 'hi [{source}] {message}', // Custom message format
-//   messageTemplate: "hi",
-//   maxMessageLength: 1000, // Truncate long messages
-//   updateDelay: 200, // Debounce delay in ms
-//   colors: {
-//     error: {
-//       background: "rgba(255, 0, 0, 0.1)",
-//       foreground: "#ff4444",
-//     },
-//     warning: {
-//       background: "rgba(255, 165, 0, 0.1)",
-//       foreground: "#ff8800",
-//     },
-//   },
-// });
-
-function getEditorLineNumber(fitchLine: number) {
-  return editor.getValue().split("\n").findIndex((l) =>
-    l.startsWith(fitchLine.toString())
-  ) + 1;
-}
 export function process_user_input(firstRun = false) {
+  let model = editor.getModel();
+  if (!model) {
+    editor.setModel(monaco.editor.getModels()[Alpine.store("tabs").current]);
+    model = editor.getModel();
+  };
+  const editorValue = editor.getValue();
   replace_words_by_fancy_symbols();
 
-  const allowedVariableNamesField = document.getElementById(
-    "allowed-variable-names",
-  );
+  const allowedVariableNamesField = document.getElementById("allowed-variable-names");
   if (!(allowedVariableNamesField instanceof HTMLInputElement)) {
     throw new Error(`allowed variable names field is of wrong node type`);
   }
 
-  const res = check_proof(
-    editor.getValue(),
-    allowedVariableNamesField.value,
-  );
+  const res = check_proof(editor.getValue(), allowedVariableNamesField.value);
   if (res.startsWith("The proof is correct!")) {
     document.getElementById("feedback").style.background = "green";
   } else if (res.startsWith("Fatal error")) {
@@ -366,7 +383,7 @@ export function process_user_input(firstRun = false) {
   document.getElementById("feedback").innerText = res;
   const matches = res.match(/(?:line\s+)(\d+)/i);
   if (matches) {
-    const editorLine = getEditorLineNumber(Number(matches[1]));
+    const editorLine = getEditorLineNumber(editorValue, Number(matches[1]));
     const markers: monaco.editor.IMarkerData[] = [
       {
         message: res,
@@ -378,74 +395,39 @@ export function process_user_input(firstRun = false) {
       },
     ];
     monaco.editor.setModelMarkers(model, "owner", markers);
-    // editor.setModelMarkers()
   } else {
     monaco.editor.setModelMarkers(model, "owner", []);
   }
-
 
   const lastLineNr = model.getFullModelRange().endLineNumber;
 
   const premises = [];
   for (let lineNr = 1; lineNr < lastLineNr; lineNr++) {
-    const line = getLineByMonacoNumber(lineNr);
+    const line = getLineByMonacoNumber(editorValue, lineNr);
     if (isFitchBar(line)) break;
     const content = line.split('|').at(-1).trimStart();
     if (content) premises.push(content);
   }
 
   // check if proof target was reached
+  const tab = Alpine.store("tabs").files[Alpine.store("tabs").current];
   const checkRes: string = check_proof_with_template(
     model.getValue(),
-    [...premises, proofTarget],
+    [...premises, tab.proofTarget],
     allowedVariableNamesField.value
   );
 
-  if (checkRes.includes('correct') && !confettiPlayed) {
-    confettiPlayed = true;
-    console.log('yes');
+  if (checkRes.includes('correct') && !tab.confettiPlayed) {
+    tab.confettiPlayed = true;
     if (!firstRun) {
-      console.log('fr');
-      tsParticles.load({
-        id: "tsparticles",
-
-        options: {
-          emitters: {
-            position: { x: 50, y: 100 },
-            rate: { quantity: 100, delay: 0.05 },
-            life: { duration: 1, count: 1 }
-          },
-          particles: {
-            move: {
-              direction: "top",
-              enable: true,
-              outModes: "destroy",
-              speed: { min: 10, max: 20 },
-              gravity: { enable: true, acceleration: 9.8 }
-            },
-            number: { value: 0 },
-            opacity: { value: 1 },
-            shape: { type: ["square", "circle"] },
-            size: { value: { min: 3, max: 8 } },
-            color: { value: ["#FF6B6B", "#4ECDC4", "#FFD93D", "#6BCF7F", "#C77DFF"] },
-            life: { duration: { value: 3 } },
-            rotate: {
-              value: { min: 0, max: 360 },
-              direction: "random",
-              animation: { enable: true, speed: 30 }
-            }
-          }
-        }
-      });
+      tsParticles.load(confettiConfig);
     }
   }
-
 }
 
 function format() {
   const formatted = format_proof(editor.getValue());
   if (formatted == "invalid") {
-    // alert("proof invalid cannot format");
     const feedbackEl = document.getElementById("feedback");
     feedbackEl.classList.remove("wiggle");
     feedbackEl.offsetHeight;
@@ -460,7 +442,6 @@ function format() {
     range: editor.getModel().getFullModelRange(),
     text: formatted,
   }]);
-  // selection.
   editor.setSelection(selection);
   // Move to end of current line
   editor.setPosition({
@@ -472,7 +453,6 @@ function format() {
 
 function fix_line_numbers() {
   const fixed = fix_line_numbers_in_proof(editor.getValue());
-
   editor.executeEdits("format-source", [{
     range: editor.getModel().getFullModelRange(),
     text: fixed,
@@ -499,34 +479,9 @@ function show_examples() {
   document.getElementById("additional-examples").hidden = !examples_are_visible;
 }
 export function load_example(index: number) {
-  let rdy = model.getValue() == "";
-  if (!rdy) {
-    rdy = confirm(
-      "Your proof area is not empty. Loading an example will overwrite your current proof. Are you sure you want to continue?",
-    );
-  }
-  if (rdy) {
-    editor.setValue(examples[index]);
-    process_user_input();
-  }
+  newFile(examples[index]);
 }
-
 window.load_example = load_example;
-
-function load_random_excercise() {
-  const excercise = excercises[(Math.random() * excercises.length) | 0];
-  proofTarget = excercise.conclusion;
-  proofTargetEl.value = proofTarget;
-  confettiPlayed = false;
-
-  let assumptionsCompiled = "";
-  for (let i = 0; i < excercise.assumptions.length; i++) {
-    assumptionsCompiled += `${i + 1} | ${excercise.assumptions[i]}\n`;
-  }
-  assumptionsCompiled += "  |----";
-  model.setValue(assumptionsCompiled);
-
-}
 
 let proof_is_upside_down = false;
 function upside_down() {
@@ -536,36 +491,6 @@ function upside_down() {
   } else {
     document.getElementById("editor_container").classList.remove("rotate-180");
   }
-}
-
-const replacements = {
-  "fa": "∀",
-  "ex": "∃",
-  "not": "¬",
-  "neg": "¬",
-  "!": "¬",
-  "impl": "→",
-  "->": "→",
-  "bic": "↔",
-  "and": "∧",
-  "&": "∧",
-  "*": "∧",
-  "or": "∨",
-  "+": "∨",
-  "bot": "⊥",
-};
-
-
-function replaceWithSymbols(input: string) {
-  let offset = -1;
-  for (const [token, replacement] of Object.entries(replacements)) {
-    // we obnly ever have one token at the time (I hope). calculate the offset and replace it
-    if (input.includes(token)) {
-      offset = token.length - 1;
-      return { result: input.replace(token, replacement), offset };
-    }
-  }
-  return { result: input, offset };
 }
 
 // when user types e.g. 'forall', replace it instantly with the proper forall unicode symbol, and
@@ -581,15 +506,13 @@ function replace_words_by_fancy_symbols() {
   }
 
   const pos = editor.getPosition();
-
   editor.executeEdits("format-source", [{
     range: editor.getModel().getFullModelRange(),
     text: proofstr,
   }]);
 
   setTimeout(() => {
-    const newPos = pos.with(undefined, pos.column - (offset - 1));
-    editor.setPosition(newPos);
+    editor.setPosition(pos.with(undefined, pos.column - (offset - 1)));
   }, 1);
 }
 
@@ -599,7 +522,7 @@ function download_proof() {
   const blob = new Blob([editor.getValue()], { type: "plain/text" });
   const fileUrl = URL.createObjectURL(blob);
   element.setAttribute("href", fileUrl);
-  element.setAttribute("download", "proof.txt");
+  element.setAttribute("download", Alpine.store("tabs").files[Alpine.store("tabs").current].name);
   element.style.display = "none";
   document.body.appendChild(element);
   element.click();
@@ -610,7 +533,7 @@ function findNumberedLineUp(monacoLineNumber: number): number | null {
   let lineNumber = null;
   let monacoLineNumber2 = monacoLineNumber;
   while (!lineNumber && monacoLineNumber2 > 0) {
-    const line = model.getValue().split("\n")[monacoLineNumber2 - 1];
+    const line = editor.getModel().getValue().split("\n")[monacoLineNumber2 - 1];
     lineNumber = parseInt(line.split(" ")[0]);
     monacoLineNumber2 -= 1;
   }
@@ -620,10 +543,14 @@ function findNumberedLineUp(monacoLineNumber: number): number | null {
 }
 
 // Listen to content changes (fires on every keystroke)
-model.onDidChangeContent((_event: monaco.editor.IModelContentChangedEvent) => {
+editor.onDidChangeModelContent(() => {
   process_user_input();
-});
+  saveToLocalStorage();
 
+});
+editor.onDidChangeModel(() => editor.getModel() && process_user_input());
+
+// bottom bar
 document.getElementById("format-button").onclick = format;
 document.getElementById("latex-button").onclick = to_latex;
 document.getElementById("load-example-button").onclick = show_examples;
@@ -632,16 +559,55 @@ document.getElementById("download-button").onclick = download_proof;
 document.getElementById("upside-down-button").onclick = upside_down;
 document.getElementById("fix-line-numbers-button").onclick = fix_line_numbers;
 document.getElementById("allowed-variable-names").onkeyup = () => process_user_input();
-document.getElementById("settings-button").onclick =
-  toggle_show_advanced_settings;
+document.getElementById("settings-button").onclick = toggle_show_advanced_settings;
+
+// tab actions
+document.getElementById("file_open").onclick = openFile;
+document.getElementById("file_new").onclick = () => newFile();
+
+const proofTargetEl = document.getElementById("proof_target") as HTMLInputElement;
 
 proofTargetEl.addEventListener("keyup", function(e) {
-  const raw = (e.target as HTMLInputElement).value;
-  const replaced = replaceWithSymbols(raw).result;
-  proofTarget = replaced;
-  proofTargetEl.value = replaced;
-  confettiPlayed = false;
+  const input = e.target as HTMLInputElement;
+  const cursorPos = input.selectionStart;
+  const cursorPosEnd = input.selectionEnd;
+  if (cursorPosEnd != cursorPos) {
+    return;
+  }
+  const raw = input.value;
+  const x = replaceWithSymbols(raw);
+
+  proofTargetEl.value = x.result;
+
+  const currentTab = Alpine.store("tabs").current;
+  Alpine.store("tabs").files[currentTab].proofTarget = x.result;
+  Alpine.store("tabs").files[currentTab].confettiPlayed = false;
+
+  // Restore cursor position
+  const newPos = x.offset == -1 ? cursorPos : cursorPos - x.offset;
+  input.setSelectionRange(newPos, newPos);
 });
 
+let hasLoadedLocalStorage = false;
+Alpine.start();
+
+
+Alpine.effect(() => {
+  Alpine.store("tabs").files;
+  saveToLocalStorage();
+});
+
+
+Alpine.effect(() => {
+  const current = Alpine.store("tabs").current;
+  editor.setModel(monaco.editor.getModels()[current]);
+});
+
+
 await init();
+window.addEventListener('storage', () => loadFromLocalStorage(), false);
+loadFromLocalStorage();
+const current = Alpine.store("tabs").current;
+editor.setModel(monaco.editor.getModels()[current]);
+
 process_user_input(true);

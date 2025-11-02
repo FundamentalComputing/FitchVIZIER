@@ -18,11 +18,30 @@
 
   <div id="editor_wrapper">
     <div id="editor_container">
-      <div style="position: relative;">
+      <!-- <button id="file_save">Save</button> -->
+      <div x-data class="flex">
+        <template x-for="(tab,i) in $store.tabs.files">
+          <div class="flex p-2 group border-solid border-gray-700 border-1"
+            :class="($store.tabs.current==i ? 'bg-[#1e1e1e] border-b-0' : '') + (i == $store.tabs.files.length - 1 ? ' border-r-1' : ' border-r-0')"
+            :class="">
+            <button x-text="tab.name" class="cursor-pointer"
+              @click="$store.tabs.current==i ? renameTab(i) : $store.tabs.current=i"></button>
+            <button x-show="$store.tabs.files.length > 1" class="pl-2 cursor-pointer opacity-0 group-hover:opacity-90"
+              :class="$store.tabs.current==i ? 'opacity-90' : ''" @click="closeTab(i)">x</button>
+          </div>
+        </template>
+        <div class="flex-grow border-gray-700 border-b-solid border-b-1 flex items-center pl-2 gap-2">
+          <button class="cursor-pointer" id="file_new">(new)</button>
+          <button class="cursor-pointer" id="file_open">(open)</button>
+        </div>
+
+      </div>
+      <div style="position: relative;" class="relative border-x-1 border-gray-700">
         <div id="editor"></div>
-        <div class="absolute bottom-0 flex flex-wrap justify-between w-full px-4 pb-2 text-lg">
+        <div class="absolute bottom-0 flex flex-wrap justify-between w-full px-4 pb-2 text-lg" x-data>
           <div class="flex-grow text-nowrap pr-4"><span>🏁 </span><input type="text" class="flex-grow w-full"
-              placeholder="What do you want to prove?" id='proof_target'>
+              placeholder="What do you want to prove?" id='proof_target'
+              x-model="$store.tabs.files[$store.tabs.current].proofTarget">
           </div>
           <div id="typing-guide2" class="">
             <!-- Typing guide: -->

@@ -49,7 +49,7 @@ a {
 
 
 
-button {
+footer button {
   padding: 8px;
   margin: 0px;
   background: #232323;
@@ -87,7 +87,7 @@ code {
 
 
 #editor {
-  height: calc(100vh - 250px);
+  height: calc(100vh - 280px);
   position: relative;
 }
 
