@@ -7,7 +7,9 @@ mod formatter;
 mod parser;
 mod proof;
 mod util;
+pub use crate::data::{Justification, NumberedLine, ProofNode};
 use crate::data::{ProofResult, Wff};
+pub use parser::parse_fitch_proof;
 
 macro_rules! default_variable_names {
     () => {
