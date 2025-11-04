@@ -3,51 +3,67 @@ use crate::formatter::format_wff;
 use std::fmt::Write;
 
 /// Exports a proof to a string that can be put in a LaTeX document.
-pub fn proof_to_latex(proof: &[ProofLine]) -> String {
+pub fn proof_to_latex(proof: &[ProofNode]) -> String {
     let mut prev_depth = 1;
     let mut is_hypo = true;
-    let proof_str = proof.iter().fold(String::new(), |mut output, l| {
-        if l.is_fitch_bar_line {
-            is_hypo = false;
-        }
-        let part1 = if l.depth == prev_depth + 1 {
-            prev_depth += 1;
-            is_hypo = true;
-            "\\open\n"
-        } else if l.depth == prev_depth - 1 {
-            prev_depth -= 1;
-            "\\close\n"
-        } else {
-            ""
-        };
-        if l.line_num.is_none() {
-            let _ = write!(output, "{}", part1);
-            return output;
-        }
-        let part2 = format!(
-            "{}{{{}}}{{{}{}}}",
-            if is_hypo {
-                "\\hypo"
+    let proof_str = proof.iter().filter(|node| !node.is_structural()).fold(
+        String::new(),
+        |mut output, node| {
+            if matches!(node, ProofNode::FitchBar { .. }) {
+                is_hypo = false;
+            }
+
+            let depth = node.depth();
+            let part1 = if depth == prev_depth + 1 {
+                prev_depth += 1;
+                is_hypo = true;
+                "\\open\n"
+            } else if depth + 1 == prev_depth {
+                prev_depth -= 1;
+                "\\close\n"
             } else {
-                "\\have"
-            },
-            l.line_num.unwrap(),
-            match &l.constant_between_square_brackets {
-                Some(Term::Atomic(t)) => format!(" \\boxed{{{}}}~ ", t),
-                _ => "".to_string(),
-            },
-            match &l.sentence {
-                Some(wff) => wff_to_latex(wff),
-                _ => "".to_string(),
-            },
-        );
-        let part3 = match &l.justification {
-            Some(just) => justification_to_latex(just),
-            _ => "".to_string(),
-        };
-        let _ = writeln!(output, "{}{}{}", part1, part2, part3);
-        output
-    });
+                ""
+            };
+
+            match node {
+                ProofNode::Numbered(line) => {
+                    let part2 = format!(
+                        "{}{{{}}}{{{}{}}}",
+                        if is_hypo {
+                            "\\hypo"
+                        } else {
+                            "\\have"
+                        },
+                        line.line_num,
+                        match &line.boxed_constant {
+                            Some(Term::Atomic(t)) => format!(" \\boxed{{{}}}~ ", t),
+                            Some(_) => panic!("boxed constant cannot be function application"),
+                            None => "".to_string(),
+                        },
+                        match &line.sentence {
+                            Some(wff) => wff_to_latex(wff),
+                            None => "".to_string(),
+                        },
+                    );
+                    let part3 = match &line.justification {
+                        Some(just) => justification_to_latex(just),
+                        None => "".to_string(),
+                    };
+                    let _ = writeln!(output, "{}{}{}", part1, part2, part3);
+                }
+                ProofNode::FitchBar {
+                    ..
+                }
+                | ProofNode::Empty {
+                    ..
+                } => {
+                    let _ = write!(output, "{}", part1);
+                }
+                _ => {}
+            }
+            output
+        },
+    );
     format!("{}{}{}", "$\n\\begin{nd}\n", proof_str, "\\end{nd}\n$")
         .replace("  ", " ")
         .replace("{ ", "{")
@@ -89,7 +105,7 @@ fn justification_to_latex(just: &Justification) -> String {
         Justification::OrElim(n, subs) => format!(
             "\\oe{{{},{}}}",
             n,
-            subs.iter().map(|(a, b)| format!("{}-{}", a, b)).collect::<Vec<String>>().join(",")
+            subs.iter().map(|(a, b)| format!("{}-{}", a, b)).collect::<Vec<String>>().join(","),
         ),
         Justification::NotIntro((a, b)) => format!("\\ni{{{a}-{b}}}"),
         Justification::NotElim(n) => format!("\\ne{{{n}}}"),

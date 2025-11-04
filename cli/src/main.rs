@@ -1,5 +1,6 @@
 extern crate fitch_proof;
 
+/// by default we use a,b,c for constants and x,y,z for variables
 const DEFAULT_ALLOWED_VARIABLE_NAMES: &str = "x,y,z,u,v,w";
 
 /// The *proof* itself (what the student wrote) should be given as a command line argument.
@@ -12,8 +13,7 @@ fn main() {
     let args: Vec<String> = std::env::args().collect();
 
     if args.len() < 2 || args.len() > 3 {
-        println!("Usage: {} <proof-file> [--no-template]", args[0]);
-        std::process::exit(1);
+        print_instructions_and_quit(args);
     }
 
     let proof_file = &args[1];
@@ -21,8 +21,7 @@ fn main() {
         if args[2] == "--no-template" {
             true
         } else {
-            println!("Usage: {} <proof-file> [--no-template]", args[0]);
-            std::process::exit(1);
+            print_instructions_and_quit(args);
         }
     } else {
         false
@@ -30,10 +29,10 @@ fn main() {
 
     let Ok(proof) = std::fs::read_to_string(proof_file) else {
         println!(
-            "Oops, it seems like the file {} could not be opened. Are you sure it exists? Aborting.",
+            "Oops, it seems like the file {} could not be opened. Aborting.\n",
             proof_file
         );
-        std::process::exit(1)
+        print_instructions_and_quit(args);
     };
     let variables = DEFAULT_ALLOWED_VARIABLE_NAMES.to_string();
 
@@ -47,4 +46,9 @@ fn main() {
         fitch_proof::check_proof_with_template(&proof, template, &variables)
     };
     println!("{}", result);
+}
+
+fn print_instructions_and_quit(args: Vec<String>) -> ! {
+    println!("Usage: {} <proof-file> [--no-template]", args[0]);
+    std::process::exit(1);
 }

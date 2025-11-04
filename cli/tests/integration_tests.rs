@@ -3,13 +3,11 @@ use std::io::Write;
 use std::path::Path;
 use std::process::{Command, Stdio};
 
-
 // Integration tests are set up as follows:
 //  in the test_cases directory each test corresponds to 2 or 3 files:
 //      - test_X.txt           the proof itself
 //      - test_X.template      template to check against  [optional]
 //      - test_X.expected      the expected output of the test
-
 
 #[test]
 fn run_integration_tests() {
@@ -55,10 +53,12 @@ fn run_integration_tests_dir(dir : &Path) {
             let mut child = command.spawn().expect("Failed to spawn child process");
 
             if use_template {
-                let template_content = fs::read_to_string(&template_file)
-                    .expect(&format!("Failed to read template file: {:?}", template_file));
+                let template_content = fs::read_to_string(&template_file).
+                    expect(&format!("Failed to read template file: {:?}", template_file));
                 let mut stdin = child.stdin.take().expect("Failed to open stdin");
-                stdin.write_all(template_content.as_bytes()).expect("Failed to write to stdin");
+                stdin
+                    .write_all(template_content.as_bytes())
+                    .expect("Failed to write to stdin");
             }
 
             let output = child.wait_with_output().expect("Failed to read stdout");
@@ -69,10 +69,13 @@ fn run_integration_tests_dir(dir : &Path) {
                 panic!("Test for {} failed with stderr:\n{}", stem, stderr);
             }
 
-            let expected_output = fs::read_to_string(&expected_file)
-                .expect(&format!("Failed to read expected file: {:?}", expected_file));
+            let expected_output = fs::read_to_string(&expected_file).
+                expect(&format!("Failed to read expected file: {:?}", expected_file));
 
-            assert_eq!(stdout.trim(), expected_output.trim(), "Test failed for {}", stem);
+            assert_eq!(stdout.trim(),
+                       expected_output.trim(),
+                       "Test failed for {}",
+                       stem);
         }
     }
 }
