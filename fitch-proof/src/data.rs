@@ -79,26 +79,6 @@ pub struct NumberedLine {
     pub boxed_constant: Option<Term>,
 }
 
-impl NumberedLine {
-    pub fn introduces_boxed_constant(&self) -> bool {
-        self.boxed_constant.is_some()
-    }
-
-    pub fn is_inference(&self) -> bool {
-        self.justification.is_some()
-    }
-}
-
-/// This a logical term. A term can be either a constant, a variable, or a function application
-/// (which is a function applied to a positive number of terms).
-#[derive(PartialEq, Debug, Clone, Hash, Eq)]
-pub enum Term {
-    /// A variable or constant.
-    Atomic(String),
-    // Function application
-    FuncApp(String, Vec<Term>),
-}
-
 #[derive(PartialEq, Debug, Clone)]
 /// A logical sentence. "Wff" stands for "well-formed formula", but this is a slightly incorrect
 /// name, since for example, a logical sentence that has predicate ariy mismatches is still
@@ -140,6 +120,17 @@ pub enum Wff {
     Equals(Term, Term),
 }
 
+/// This a logical term. A term can be either a constant, a variable, or a function application
+/// (which is a function applied to a positive number of terms).
+#[derive(PartialEq, Debug, Clone, Hash, Eq)]
+pub enum Term {
+    /// A variable or constant.
+    Atomic(String),
+    // Function application
+    FuncApp(String, Vec<Term>),
+}
+
+
 /// This enum represents the justification rules for an inference. The associated [usize]s denote
 /// the line numbers being represented.
 #[derive(PartialEq, Debug, Clone)]
@@ -163,6 +154,43 @@ pub enum Justification {
     ExistsIntro(usize),
     ExistsElim(usize, (usize, usize)),
     Reit(usize),
+}
+
+impl NumberedLine {
+    pub fn introduces_boxed_constant(&self) -> bool {
+        self.boxed_constant.is_some()
+    }
+
+    pub fn is_inference(&self) -> bool {
+        self.justification.is_some()
+    }
+}
+
+
+impl Justification {
+    pub fn rule_used(self: &Justification) -> (&'static str, &'static str) {
+        match self {
+            Justification::AndIntro(_) => ("∧", "Intro"),
+            Justification::AndElim(_) => ("∧", "Elim"),
+            Justification::OrIntro(_) => ("∨", "Intro"),
+            Justification::OrElim(_, _) => ("∨", "Elim"),
+            Justification::NotIntro(_) => ("¬", "Intro"),
+            Justification::NotElim(_) => ("¬", "Elim"),
+            Justification::BottomIntro(_, _) => ("⊥", "Intro"),
+            Justification::BottomElim(_) => ("⊥", "Elim"),
+            Justification::ImpliesIntro(_) => ("→", "Intro"),
+            Justification::ImpliesElim(_, _) => ("→", "Elim"),
+            Justification::BicondIntro(_, _) => ("↔", "Intro"),
+            Justification::BicondElim(_, _) => ("↔", "Elim"),
+            Justification::EqualsIntro => ("=", "Intro"),
+            Justification::EqualsElim(_, _) => ("=", "Elim"),
+            Justification::ForallIntro(_) => ("∀", "Intro"),
+            Justification::ForallElim(_) => ("∀", "Elim"),
+            Justification::ExistsIntro(_) => ("∃", "Intro"),
+            Justification::ExistsElim(_, _) => ("∃", "Elim"),
+            Justification::Reit(_) => ("R", "Reit"),
+        }
+    }
 }
 
 pub enum ProofResult {

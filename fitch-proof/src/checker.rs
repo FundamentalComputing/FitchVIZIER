@@ -296,7 +296,7 @@ impl Proof {
                 ProofNode::Numbered(line) if line.introduces_boxed_constant() => {
                     let new_boxed_const = &line.boxed_constant;
                     // before we add the new variable to current scope,
-                    // test that it was not already in scope:                    
+                    // test if it was not already in scope:
                     if currently_in_scope.contains(new_boxed_const) {
                         errors.push(format!("Line {}: you cannot introduce the same boxed constant twice in nested subproofs", line.line_num));
                     }

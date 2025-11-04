@@ -344,10 +344,10 @@ impl Proof {
                     }
                 }
 
-               // in HALF-well-structured proofs, after a premise w/out b.c. there should be either:
-               //  - a Fitch bar line
-               //  - another premise without boxed constant
-               //       (only at the beginning of the proof, but we already check for
+                // in HALF-well-structured proofs, after a premise w/out b.c. there should be either:
+                //  - a Fitch bar line
+                //  - another premise without boxed constant
+                //       (only at the beginning of the proof, but we already check for
                 //        that in the StructuralNode::SubproofOpen arm of this match expression)
                 //  - an inference
                 //  - a SubproofOpen

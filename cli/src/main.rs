@@ -1,5 +1,23 @@
 extern crate fitch_proof;
 
+use clap::Parser;
+
+mod summary;
+use summary::*;
+
+#[derive(Parser)]
+struct Args {
+    #[arg(required = true)]
+    path: Vec<String>,
+
+    #[arg(long, action)]
+    no_template: bool,
+
+    #[arg(long, action)]
+    summary: bool
+}
+
+
 /// by default we use a,b,c for constants and x,y,z for variables
 const DEFAULT_ALLOWED_VARIABLE_NAMES: &str = "x,y,z,u,v,w";
 
@@ -10,31 +28,31 @@ const DEFAULT_ALLOWED_VARIABLE_NAMES: &str = "x,y,z,u,v,w";
 /// Currently, there is NO SUPPORT for a custom set of allowed variable names over the command
 /// line (it is only in the web GUI).
 fn main() {
-    let args: Vec<String> = std::env::args().collect();
+    let args = Args::parse();
 
-    if args.len() < 2 || args.len() > 3 {
-        print_instructions_and_quit(args);
+    let no_template = args.no_template;
+    let summary = args.summary;
+
+    for proof_file in &args.path {
+        check_file(no_template, proof_file)
+    }
+    
+    if summary {
+        summaries_files(&args.path);
     }
 
-    let proof_file = &args[1];
-    let no_template = if args.len() == 3 {
-        if args[2] == "--no-template" {
-            true
-        } else {
-            print_instructions_and_quit(args);
-        }
-    } else {
-        false
-    };
+}
+
+fn check_file(no_template : bool, proof_file : &String) {
+    let variables = DEFAULT_ALLOWED_VARIABLE_NAMES.to_string();
 
     let Ok(proof) = std::fs::read_to_string(proof_file) else {
         println!(
-            "Oops, it seems like the file {} could not be opened. Aborting.\n",
+            "{}: Fatal error: Cannot open the file. Aborting.",
             proof_file
         );
-        print_instructions_and_quit(args);
+        std::process::exit(1)
     };
-    let variables = DEFAULT_ALLOWED_VARIABLE_NAMES.to_string();
 
     let result: String = if no_template {
         fitch_proof::check_proof(&proof, &variables)
@@ -46,9 +64,5 @@ fn main() {
         fitch_proof::check_proof_with_template(&proof, template, &variables)
     };
     println!("{}", result);
-}
 
-fn print_instructions_and_quit(args: Vec<String>) -> ! {
-    println!("Usage: {} <proof-file> [--no-template]", args[0]);
-    std::process::exit(1);
 }
