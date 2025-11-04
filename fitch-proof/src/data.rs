@@ -1,56 +1,92 @@
-/// a [ProofLine] corresponds *directly* to one line in the user's inputted proof.
+/// A `ProofNode` represents every relevant element of a Fitch-style proof in document order.
 ///
-/// If a user types in a proof (which is a string), then this proof is split into lines (which are
-/// also strings), and each of these lines correspond directly to one [ProofLine].
+/// Roughly, it correponds to either a physical line in a text-based
+/// proof, or it represens opening/closing a new subproof.
+#[derive(PartialEq, Debug, Clone)]
+pub enum ProofNode {
+    /// A numbered line (premise or inference). These are the only nodes that carry a line number.
+    Numbered(NumberedLine),
+    /// A Fitch bar line (`| ---`) separating premises from a subproof body or the initial derivation.
+    FitchBar {
+        depth: usize,
+    },
+    /// An empty line that contains only scope markers (vertical bars). These are rare but allowed.
+    Empty {
+        depth: usize,
+    },
+    /// Synthetic element inserted when a new subproof scope is opened. It immediately precedes the
+    /// numbered line that serves as the subproof premise.
+    SubproofOpen {
+        depth: usize,
+    },
+    /// Synthetic element inserted when one or more subproof scopes close. It precedes the next
+    /// textual node at the shallower depth.
+    SubproofClose {
+        depth: usize,
+    },
+}
+
+impl ProofNode {
+    pub fn depth(&self) -> usize {
+        match self {
+            ProofNode::Numbered(line) => line.depth,
+            ProofNode::FitchBar {
+                depth,
+            }
+            | ProofNode::Empty {
+                depth,
+            }
+            | ProofNode::SubproofOpen {
+                depth,
+            }
+            | ProofNode::SubproofClose {
+                depth,
+            } => *depth,
+        }
+    }
+
+    pub fn as_numbered(&self) -> Option<&NumberedLine> {
+        if let ProofNode::Numbered(line) = self {
+            Some(line)
+        } else {
+            None
+        }
+    }
+
+    pub fn is_fitch_bar(&self) -> bool {
+        matches!(self, ProofNode::FitchBar { .. })
+    }
+
+    pub fn is_structural(&self) -> bool {
+        matches!(self, ProofNode::SubproofOpen { .. } | ProofNode::SubproofClose { .. })
+    }
+}
+
+/// Numbered proof lines carry the logical content of the user's proof.
 ///
-/// There are exactly 6 possible types of lines that the user can make:
-/// 1. an empty line, consisting of only a positive number of vertical bars
-/// 2. a Fitch bar line, which consists of a positive number of vertical bars followed by a
-///    positive number of minuses.
-/// 3. a premise that only introduces a boxed constant, without a logical sentence
-/// 4. a premise that contains only a logical sentence, no boxed constant
-/// 5. a premise that contains both a boxed constant introduction and a logical sentence
-/// 6. an inference: a line that contains a sentence and justification
-///
-/// Each line of the user's input must correspond to exactly one of the above types. If the user
-/// writes garbage, then it is not possible to convert it into [ProofLine]s and a fatal error will
-/// be given to the user.
-#[derive(PartialEq, Debug)]
-pub struct ProofLine {
-    /// The line number of the proof line. This is *not* the index at which the current line
-    /// occured in the input string that the user gave, but it is the line number inside a Fitch
-    /// proof that the user wrote themselves. For example, for a line like this:
-    ///
-    /// `42 | | | | P(a,b,c,d)  =Elim:137,108`
-    ///
-    /// this field in the struct would be `Some(42)`. This field must be [None] if and only if the
-    /// corresponding line was an empty line or a Fitch bar line. In all other cases, the line
-    /// number must be [Some(_)].
-    pub line_num: Option<usize>,
-    /// The number of vertical bars on the left side. This indicates in how many nested subproofs
-    /// this proof line is.
-    ///
-    /// For example, this line would have a `depth` of `4`, since there are four vertical bars.
-    ///
-    /// `42 | | | | P(a,b,c,d)  =Elim:137,108`
+/// A numbered line may be a premise (no justification), an inference
+/// (justification present), or a placeholder line where the user has
+/// not yet written the justification -- we want to be able to deal
+/// with those since we want to provide feedback on imcomplete proofs.
+/// Additionaly, when a boxed constant is introduced, it is stored in
+/// `boxed_constant`.
+#[derive(PartialEq, Debug, Clone)]
+pub struct NumberedLine {
+    pub line_num: usize,
     pub depth: usize,
-    // This field is `true` if and only if the corresponding proof line is a Fitch bar line.
-    pub is_fitch_bar_line: bool,
-    // The logical sentence ([Wff]) that this proof line contains.
-    //
-    // This field must be [None] if this proof line does not contain a sentence, which is
-    // if you have a premise that only introduces a boxed constant without sentence, or if
-    // you have an empty line or a Fitch bar line.
     pub sentence: Option<Wff>,
-    /// If the current proof line has a justification, it is stored in this field.
-    ///
-    /// If the current proof line has no justification, then this field should be [None]. This can
-    /// be the case for example for a premise, empty line, or Fitch bar line. It could also be that
-    /// the user intended this to be an inference, but simply did not write the justification yet.
     pub justification: Option<Justification>,
-    /// If the current proof line is a premise that introduces a constant in a box, then this field
-    /// contains it.
-    pub constant_between_square_brackets: Option<Term>,
+    pub boxed_constant: Option<Term>,
+}
+
+impl NumberedLine {
+    pub fn introduces_boxed_constant(&self) -> bool {
+        self.boxed_constant.is_some()
+    }
+
+    pub fn is_inference(&self) -> bool {
+        self.justification.is_some()
+    }
 }
 
 /// This a logical term. A term can be either a constant, a variable, or a function application
@@ -106,7 +142,7 @@ pub enum Wff {
 
 /// This enum represents the justification rules for an inference. The associated [usize]s denote
 /// the line numbers being represented.
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
 pub enum Justification {
     AndIntro(Vec<usize>),
     AndElim(usize),

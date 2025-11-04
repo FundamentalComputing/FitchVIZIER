@@ -4,55 +4,61 @@ use crate::data::*;
 
 /// Formats a proof.
 ///
-/// PRECONDITION (panics otherwise): !proof_lines.is_empty()
-pub fn format_proof(proof_lines: Vec<ProofLine>) -> String {
-    // here we build the formatted proof
-    let mut line_strings: Vec<String> = proof_lines
+/// PRECONDITION (panics otherwise): !proof_nodes.is_empty()
+pub fn format_proof(proof_nodes: Vec<ProofNode>) -> String {
+    let text_nodes: Vec<ProofNode> =
+        proof_nodes.into_iter().filter(|node| !node.is_structural()).collect();
+
+    let mut line_strings: Vec<String> = text_nodes
         .iter()
-        .map(|pl| {
-            if pl.line_num.is_some() {
-                pl.line_num.unwrap().to_string()
-            } else {
-                "".to_string()
-            }
+        .map(|node| match node {
+            ProofNode::Numbered(line) => line.line_num.to_string(),
+            _ => "".to_string(),
         })
         .collect();
 
     pad_to_same_length(&mut line_strings, 1);
 
-    for (line, line_string) in zip(&proof_lines, &mut line_strings) {
-        line_string.push_str(format!("|{}", " |".repeat(line.depth - 1)).as_str());
+    for (node, line_string) in zip(&text_nodes, &mut line_strings) {
+        let depth = node.depth();
+        line_string.push_str(format!("|{}", " |".repeat(depth.saturating_sub(1))).as_str());
     }
 
-    for (line, line_string) in zip(&proof_lines, &mut line_strings) {
-        if line.is_fitch_bar_line {
+    for (node, line_string) in zip(&text_nodes, &mut line_strings) {
+        if matches!(node, ProofNode::FitchBar { .. }) {
             line_string.push_str("----");
         }
     }
 
-    for (line, line_string) in zip(&proof_lines, &mut line_strings) {
-        if line.constant_between_square_brackets.is_some() {
-            line_string.push_str(" [");
-            line_string.push_str(match line.constant_between_square_brackets.as_ref().unwrap() {
-                Term::Atomic(str) => str,
-                _ => panic!(),
-            });
-            line_string.push(']');
+    for (node, line_string) in zip(&text_nodes, &mut line_strings) {
+        if let ProofNode::Numbered(line) = node {
+            if let Some(term) = &line.boxed_constant {
+                line_string.push_str(" [");
+                line_string.push_str(match term {
+                    Term::Atomic(str) => str,
+                    _ => panic!(),
+                });
+                line_string.push(']');
+            }
         }
     }
 
-    for (line, line_string) in zip(&proof_lines, &mut line_strings) {
-        if line.sentence.is_some() {
-            line_string.push(' ');
-            line_string.push_str(&format_wff(line.sentence.as_ref().unwrap()));
+    for (node, line_string) in zip(&text_nodes, &mut line_strings) {
+        if let ProofNode::Numbered(line) = node {
+            if let Some(sentence) = &line.sentence {
+                line_string.push(' ');
+                line_string.push_str(&format_wff(sentence));
+            }
         }
     }
 
     pad_to_same_length(&mut line_strings, 9);
 
-    for (line, line_string) in zip(&proof_lines, &mut line_strings) {
-        if line.justification.is_some() {
-            line_string.push_str(&format_justification(line.justification.as_ref().unwrap()));
+    for (node, line_string) in zip(&text_nodes, &mut line_strings) {
+        if let ProofNode::Numbered(line) = node {
+            if let Some(just) = &line.justification {
+                line_string.push_str(&format_justification(just));
+            }
         }
     }
 
