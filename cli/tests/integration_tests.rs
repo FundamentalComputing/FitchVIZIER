@@ -13,8 +13,13 @@ use std::process::{Command, Stdio};
 
 #[test]
 fn run_integration_tests() {
+    run_integration_tests_dir(Path::new("tests/test_cases"));
+    run_integration_tests_dir(Path::new("tests/private"));
+}
+
+fn run_integration_tests_dir(dir : &Path) {
     let cli_path = env!("CARGO_BIN_EXE_cli");
-    let test_cases_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/test_cases");
+    let test_cases_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join(dir);
 
     for entry in fs::read_dir(test_cases_dir).expect("Failed to read test_cases directory") {
         let entry = entry.expect("Failed to read directory entry");
