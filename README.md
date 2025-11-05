@@ -8,12 +8,13 @@ The tool also returns a (hopefully useful) error message in case the proof is no
 
 This application takes Fitch proofs as they are defined in *Language, Proof and Logic*, by Dave Barker-Plummer, Jon Barwise and John Etchemendy.
 
-# How to run it?
+# Building and running FitchVIZIERE
 
-It is accessible here: <https://fitch.rug.themisjudge.nl>
+## Web version
 
-If you want to build and run the application locally, then clone the repository, install Cargo if you haven't already and install `wasm-pack` (to compile Rust to WebAssembly) and do:
+The web interface is accessible here: <https://fitch.rug.themisjudge.nl>
 
+If you want to build and run the application locally, then clone the repository, install Cargo if you haven't already and install `wasm-pack` (to compile Rust to WebAssembly) and run the following in the `fitch-proof` directory:
 ```
 wasm-pack build --target web
 ```
@@ -25,7 +26,21 @@ python3 -m http.server 8080
 
 And then open [http://localhost:8080/](http://localhost:8080/) in your favorite web browser.
 
-The CLI interface can be used as follows: the first argument is a file
-with the proof; the STDIN contains the "template" (e.g. the statement
-that has to be proven). The CLI then checks that the proof is correct
-and that it proves the statement that was provided via STDIN.
+## CLI version
+
+To build the CLI version run the following in the `cli` directory:
+```
+cargo build --release
+```
+The resulting binary is then found in `target/release/` directory.
+
+
+The CLI interface can be used as follows: 
+```
+./cli file1.txt [file2.txt ...] [--no-template] [--summary]
+```
+will run the checker on all the proof filees, checking them against
+the template (i.e. matching certain premises and a certain conclusion)
+which is read from STDIN. If the `--no-template` option is selected,
+than the template is skipped. If the `--summary` option is selected it
+will further print the summary of the rule coverage in the proofs.
