@@ -1,0 +1,1 @@
+Fatal error: parser failure near line 2: failed to parse proof line. The proof line contains a colon, but this colon appears so early that it cannot possibly be a justification
