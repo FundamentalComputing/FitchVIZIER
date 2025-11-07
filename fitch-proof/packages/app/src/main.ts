@@ -20,7 +20,7 @@ import Alpine from 'alpinejs';
 import { languagedef, theme } from "./languagedef.ts";
 import {
   getEditorLineNumber, getFile, getLineByMonacoNumber, getLineDepth,
-  getLineType, isFitchBar, replaceWithSymbols
+  getLineType, isFitchBar, makeUUID, replaceWithSymbols
 } from "./helpers.ts";
 import { confettiConfig } from "./confetti.ts";
 
@@ -52,7 +52,7 @@ declare module 'alpinejs' {
 const initContent = `1 | A
   |----
 2 | A           Reit: 1`;
-const uri = monaco.Uri.parse("inmemory://test");
+const uri = monaco.Uri.parse("inmemory://" + makeUUID());
 const initModel = monaco.editor.createModel(initContent, "fitch", uri);
 
 Alpine.store('tabs', {
@@ -229,7 +229,7 @@ async function openFile() {
 
 let newFileCounter = 1;
 function newFile(content?: string) {
-  const uri = monaco.Uri.parse(`inmemory://new-${newFileCounter}.txt`);
+  const uri = monaco.Uri.parse(`inmemory://${makeUUID()}`);
   monaco.editor.createModel(content ?? initContent, "fitch", uri);
   const len = Alpine.store("tabs").files.push({
     name: `new-${newFileCounter}.txt`, proofTarget: "", confettiPlayed: false, uri
