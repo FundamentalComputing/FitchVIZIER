@@ -17,7 +17,7 @@ import examples from "./examples.ts";
 import excercises from "./excercises.ts";
 
 import Alpine from 'alpinejs';
-import { languagedef, theme } from "./languagedef.ts";
+import { languagedef, theme, lightTheme } from "./languagedef.ts";
 import {
   getEditorLineNumber, getFile, getLineByMonacoNumber, getLineDepth,
   getLineType, isFitchBar, makeUUID, replaceWithSymbols
@@ -72,7 +72,14 @@ monaco.languages.register({
 
 // Define the syntax highlighting rules and color theme
 monaco.languages.setMonarchTokensProvider("fitch", languagedef);
-monaco.editor.defineTheme("fitch-theme", theme);
+const prefersDark = window.matchMedia('(prefers-color-scheme: dark)');
+monaco.editor.defineTheme("fitch-theme", prefersDark.matches ? theme : lightTheme);
+
+
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (ev: MediaQueryListEvent) => {
+  const isDark = ev.matches;
+  monaco.editor.defineTheme("fitch-theme", isDark ? theme : lightTheme);
+});
 
 const editor = monaco.editor.create(document.getElementById("editor"), {
   model: initModel,
@@ -94,6 +101,7 @@ window.editor = editor;
 
 editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, function() {
   format();
+  saveToLocalStorage();
 });
 
 // Add custom key bindings
@@ -135,7 +143,6 @@ function saveToLocalStorage() {
 
 function loadFromLocalStorage() {
   const importedData = JSON.parse(localStorage.getItem("tabs")) as Omit<TabsStore, 'current'>;
-  console.log(importedData);
   if (!importedData.files) {
     return;
   }
@@ -164,7 +171,6 @@ function loadFromLocalStorage() {
   if (newTabsData.current >= newTabsData.files.length - 1) {
     Alpine.store("tabs").current = 0;
 
-    console.log('reset to 0');
   }
   Alpine.store("tabs").files = newTabsData.files;
   newFileCounter = highestNewFile + 1;
@@ -512,7 +518,7 @@ function replace_words_by_fancy_symbols() {
   }]);
 
   setTimeout(() => {
-    editor.setPosition(pos.with(undefined, pos.column - (offset - 1)));
+    editor.setPosition(pos.with(undefined, pos.column - (offset)));
   }, 1);
 }
 

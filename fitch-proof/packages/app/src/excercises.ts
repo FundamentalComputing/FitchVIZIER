@@ -39,4 +39,28 @@ export default [
     assumptions: ["∃x ∀y P(x,y)"],
     conclusion: "∀y ∃x P(x,y)"
   },
+  {
+    assumptions: ["R(a,b) ∧ (R(b,a) → R(c,c))", "a=b"],
+    conclusion: "¬R(c,a) → ¬(a=c)"
+  },
+  {
+    assumptions: ["(A → B) ∨ ((B → C) → C)", "A ∧ ¬B"],
+    conclusion: "C"
+  },
+  {
+    assumptions: ["∀x ∃y (P(x) → R(x,y))", "∀x ∀y ((R(x,y) ∨ (x=a)) → P(x))"],
+    conclusion: "∃x R(a,x)"
+  },
+  {
+    assumptions: ["∀x ∀y ¬R(x,y)"],
+    conclusion: "¬∃x R(x,f(x))"
+  },
+  {
+    assumptions: ["(P ∨ Q) ∧ R", "¬Q"],
+    conclusion: "R ∧ (R → P)"
+  },
+  {
+    assumptions: ["∀x (P(x) → R(a,x))"],
+    conclusion: "∀x ((a=x) → ∃y R(x,y))"
+  },
 ];

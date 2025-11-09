@@ -6,23 +6,24 @@
   <title>BetterFitchVIZIER</title>
 </head>
 
-<body>
+<body class="text-center pb-4 text-gray-700 dark:bg-black dark:text-white font-[monospace]">
   <script type="module" src="/src/main.ts"></script>
   <link href="/src/style.css" rel="stylesheet">
 
-  <header>
+  <header class="py-4">
     <p>
-      <strong style="font-size:50px;color:white;"><span style="color: red;">Better</span>Fitch<em>VIZIER</em></strong>
+      <strong class="text-5xl dark:text-white"><span class="text-red-600">Better</span>Fitch<em>VIZIER</em></strong>
     </p>
   </header>
 
-  <div id="editor_wrapper">
-    <div id="editor_container">
+  <div id="editor_wrapper" class="flex justify-center px-2">
+    <div id="editor_container"
+      class="w-full max-w-[90rem] text-left transition-transform duration-[5000ms] ease-linear">
       <!-- <button id="file_save">Save</button> -->
       <div x-data class="flex">
         <template x-for="(tab,i) in $store.tabs.files">
-          <div class="flex p-2 group border-solid border-gray-700 border-1"
-            :class="($store.tabs.current==i ? 'bg-[#1e1e1e] border-b-0' : '') + (i == $store.tabs.files.length - 1 ? ' border-r-1' : ' border-r-0')"
+          <div class="flex p-2 group border-solid border-gray-300 dark:border-gray-700 border-1"
+            :class="($store.tabs.current==i ? 'bg-[#f5f5f5] dark:bg-[#1e1e1e] border-b-0' : '') + (i == $store.tabs.files.length - 1 ? ' border-r-1' : ' border-r-0')"
             :class="">
             <button x-text="tab.name" class="cursor-pointer"
               @click="$store.tabs.current==i ? renameTab(i) : $store.tabs.current=i"></button>
@@ -30,13 +31,14 @@
               :class="$store.tabs.current==i ? 'opacity-90' : ''" @click="closeTab(i)">x</button>
           </div>
         </template>
-        <div class="flex-grow border-gray-700 border-b-solid border-b-1 flex items-center pl-2 gap-2">
+        <div
+          class="flex-grow border-gray-300 dark:border-gray-700 border-b-solid border-b-1 flex items-center pl-2 gap-2">
           <button class="cursor-pointer" id="file_new">(new)</button>
           <button class="cursor-pointer" id="file_open">(open)</button>
         </div>
 
       </div>
-      <div style="position: relative;" class="relative border-x-1 border-gray-700">
+      <div style="position: relative;" class="relative border-x-1 border-gray-300 dark:border-gray-700">
         <div id="editor"></div>
         <div class="absolute bottom-0 flex flex-wrap justify-between w-full px-4 pb-2 text-lg" x-data>
           <div class="flex-grow text-nowrap pr-4"><span>🏁 </span><input type="text" class="flex-grow w-full"
@@ -45,46 +47,48 @@
           </div>
           <div id="typing-guide2" class="">
             <!-- Typing guide: -->
-            <span style="color:red">∧</span>:<span style=color:lightblue>and/&/*</span>
-            <span style="color:red">∨</span>:<span style=color:lightblue>or/+</span>
-            <span style="color:red">¬</span>:<span style=color:lightblue>not/neg/!</span>
-            <span style="color:red">→</span>:<span style=color:lightblue>impl/-></span>
-            <span style="color:red">↔</span>:<span style=color:lightblue>bic</span>
-            <span style="color:red">⊥</span>:<span style=color:lightblue>bot</span>
-            <span style="color:red">∀</span>:<span style=color:lightblue>fa</span>
-            <span style="color:red">∃</span>:<span style=color:lightblue>ex</span>
+            <span style="color:red">∧</span>:<span class="dark:text-blue-200">and/&/*</span>
+            <span style="color:red">∨</span>:<span class="dark:text-blue-200">or/+</span>
+            <span style="color:red">¬</span>:<span class="dark:text-blue-200">not/neg/!</span>
+            <span style="color:red">→</span>:<span class="dark:text-blue-200">impl/-></span>
+            <span style="color:red">↔</span>:<span class="dark:text-blue-200">bic</span>
+            <span style="color:red">⊥</span>:<span class="dark:text-blue-200">bot</span>
+            <span style="color:red">∀</span>:<span class="dark:text-blue-200">fa</span>
+            <span style="color:red">∃</span>:<span class="dark:text-blue-200">ex</span>
           </div>
         </div>
       </div>
 
-      <div id="feedback" class="important-box" style="font-weight:bold">
+      <div id="feedback" class="important-box bg-green flex items-center text-lg p-4 text-white"
+        style="font-weight:bold">
       </div>
     </div>
   </div>
 
   <footer>
-    <div id="button_row">
-      <button id="latex-button" title="Export proof to LaTeX">EXPORT TO LATEX</button>
-      <button id="format-button" title="Make your proof more beautiful!">FORMAT PROOF (Ctrl+S)</button>
+    <div id="button_row" class="[&>*]:bg-gray-300 [&>*]:dark:bg-gray-800">
+      <button id="format-button" title="Make your proof more beautiful!">FORMAT (Ctrl+S)</button>
+      <button id="download-button" title="Download this proof as a .txt file">DOWNLOAD TXT</button>
+      <button id="latex-button" title="Export proof to LaTeX">EXPORT AS LATEX</button>
       <button id="fix-line-numbers-button"
         title="Fix the line numbers in a proof, and automatically update justifications. For example, suppose you want to delete a line in the middle of your proof. In that case, you can just delete that line and press this button afterwards, which will fix up the line numbers. If you want to insert a line in the middle of your proof, just initially give it a line number of 100 or so, and click this button afterwards.">FIX
         LINE NUMBERS</button>
-      <button id="load-example-button" title="Load example proofs">SHOW EXAMPLES</button>
+      <button id="load-example-button" title="Load example proofs">EXAMPLES</button>
       <button id="load-excercise-button" title="Load randm excercise">RANDOM EXCERCISE</button>
-      <button id="download-button" title="Download this proof as a .txt file">DOWNLOAD</button>
       <button id="settings-button" title="Toggle visibility of advanced settings">ADVANCED SETTINGS</button>
     </div>
-    <div id="additional-examples" hidden>
+    <div id="additional-examples" hidden
+      class="p-2 border-gray-300 dark:border-gray-700 border-1 rounded-[10px] max-w-[100ch] mx-auto mb-2">
       <strong>Example proofs</strong>
       <ul>
-        <li><a href="javascript:load_example(0);">A ∧ B ⊢ B ∧ A</a></li>
-        <li><a href="javascript:load_example(1);">P(a) ∧ P(b), a=c ∨ b=c ⊢ P(c)</a></li>
-        <li><a href="javascript:load_example(2);">∀x∃y R(x,y) → ∃y∀x R(x,y) ⊢ ∃x(∀y ¬R(x,y) ∨ ∀y R(y,x))</a></li>
+        <li><a class="underline" href="javascript:load_example(0);">A ∧ B ⊢ B ∧ A</a></li>
+        <li><a class="underline" href="javascript:load_example(1);">P(a) ∧ P(b), a=c ∨ b=c ⊢ P(c)</a></li>
+        <li><a class="underline" href="javascript:load_example(2);">∀x∃y R(x,y) → ∃y∀x R(x,y) ⊢ ∃x(∀y ¬R(x,y) ∨ ∀y
+            R(y,x))</a></li>
       </ul>
     </div>
     <div id="advanced-settings"
-      style="padding-top:10px;background-color: white;border: 3px solid black;border-radius: 10px;color:black; max-width: 100ch; margin-left: auto; margin-right: auto; "
-      hidden>
+      class="p-2 border-gray-300 dark:border-gray-700 border-1 rounded-[10px] max-w-[100ch] mx-auto mb-2" hidden>
       <strong>Advanced Settings (do not change unless you really have a good reason)</strong>
       <br>
       <br>
