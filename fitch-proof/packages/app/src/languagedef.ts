@@ -6,7 +6,7 @@ export const languagedef: monaco.languages.IMonarchLanguage = {
 
       // Justifications - rule names
       [
-        /..\b(Intro|Elim|Reit)\b/,
+        /((?:\S\s)?\b(?:Intro|Elim|Reit)\b)/,
         "justification.rule-name",
       ],
 
