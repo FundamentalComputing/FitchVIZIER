@@ -37,6 +37,21 @@ export function replaceWithSymbols(input: string) {
   return { result: input, offset };
 }
 
+
+
+export function findNumberedLineUp(editorValue: string, monacoLineNumber: number): number | null {
+  let lineNumber = null;
+  let monacoLineNumber2 = monacoLineNumber;
+  while (!lineNumber && monacoLineNumber2 > 0) {
+    const line = editorValue.split("\n")[monacoLineNumber2 - 1];
+    lineNumber = parseInt(line.split(" ")[0]);
+    monacoLineNumber2 -= 1;
+  }
+
+  if (isNaN(lineNumber)) return null;
+  return lineNumber;
+}
+
 export function getEditorLineNumber(editorValue: string, fitchLine: number) {
   return editorValue.split("\n").findIndex((l) =>
     l.startsWith(fitchLine.toString())
@@ -102,4 +117,11 @@ export async function getFile(): Promise<File> {
       input.click();
     });
   }
+}
+
+export function wiggleFeedback() {
+  const feedbackEl = document.getElementById("feedback");
+  feedbackEl.classList.remove("wiggle");
+  feedbackEl.offsetHeight;
+  feedbackEl.classList.add("wiggle");
 }

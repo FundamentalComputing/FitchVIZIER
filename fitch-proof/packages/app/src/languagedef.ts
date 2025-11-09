@@ -43,8 +43,6 @@ export const languagedef: monaco.languages.IMonarchLanguage = {
       // Function applications like f(a), g(x,y)
       [/[a-z]+(?=\()/, "function"],
 
-
-
       // Comma separator
       [/,/, "delimiter"],
 
