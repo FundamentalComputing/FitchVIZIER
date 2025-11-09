@@ -512,7 +512,7 @@ function replace_words_by_fancy_symbols() {
   }]);
 
   setTimeout(() => {
-    editor.setPosition(pos.with(undefined, pos.column - (offset - 1)));
+    editor.setPosition(pos.with(undefined, pos.column - (offset)));
   }, 1);
 }
 
