@@ -17,6 +17,8 @@ import {
   format_proof,
   fix_line_numbers_in_proof
 } from "@workspace/library";
+import { confettiConfig } from "./confetti";
+import { tsParticles } from "@tsparticles/engine";
 
 export let editor: monaco.editor.IStandaloneCodeEditor;
 
