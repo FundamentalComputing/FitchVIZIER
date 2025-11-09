@@ -2,116 +2,17 @@
 @import "tailwindcss";
 
 
-body {
-  text-align: center;
-  padding-bottom: 3em;
-  background-color: black;
-  color: white;
-  font-family: monospace;
-}
-
-header {
-  padding-top: 1em;
-  padding-bottom: 1em;
-  margin: 0;
-}
-
-a {
-  color: yellow;
-  text-decoration: none;
-}
-
-#additional-examples {
-  padding-top: 10px;
-  border: 3px solid black;
-  border-radius: 10px;
-  color: white;
-  max-width: 100ch;
-  margin-bottom: 1em;
-  margin-left: auto;
-  margin-right: auto;
-  background-color: #1e1e1e;
-}
-
-#additional-examples a:link {
-  color: white;
-  text-decoration: underline solid rgb(150, 150, 150);
-}
-
-#additional-examples ul {
-  list-style-type: none;
-  padding: 0px;
-  margin: 0px;
-
-  padding-top: 10px;
-  padding-bottom: 20px;
-}
-
-
-
 footer button {
   padding: 8px;
   margin: 0px;
-  background: #232323;
   border-radius: 4px;
   border: 0px;
-  color: white;
   cursor: pointer;
 }
-
-code {
-  background-color: gray;
-}
-
-#proof-field {
-  background: #232323;
-  color: white;
-  display: none;
-}
-
-#editor_wrapper {
-  display: flex;
-  justify-content: center;
-  padding-left: 1em;
-  padding-right: 1em;
-}
-
-#editor_container {
-  width: 100%;
-  max-width: 90rem;
-  text-align: left;
-  transition-property: rotate;
-  transition-duration: 5000ms;
-  transition-timing-function: linear;
-}
-
 
 #editor {
   height: calc(100vh - 280px);
   position: relative;
-}
-
-.important-box {
-  color: white;
-  font-size: 20px;
-  background-color: #1e1e1e;
-  display: inline-block;
-  padding: 4mm;
-}
-
-.row {
-  width: 100%;
-  display: flex;
-  flex-direction: column-reverse;
-  justify-content: center;
-  background: transparent;
-}
-
-#feedback {
-  background-color: green;
-  display: flex;
-  align-items: center;
-  font-size: 16px;
 }
 
 #typing-guide {

@@ -17,7 +17,7 @@ import examples from "./examples.ts";
 import excercises from "./excercises.ts";
 
 import Alpine from 'alpinejs';
-import { languagedef, theme } from "./languagedef.ts";
+import { languagedef, theme, lightTheme } from "./languagedef.ts";
 import {
   getEditorLineNumber, getFile, getLineByMonacoNumber, getLineDepth,
   getLineType, isFitchBar, makeUUID, replaceWithSymbols
@@ -72,7 +72,14 @@ monaco.languages.register({
 
 // Define the syntax highlighting rules and color theme
 monaco.languages.setMonarchTokensProvider("fitch", languagedef);
-monaco.editor.defineTheme("fitch-theme", theme);
+const prefersDark = window.matchMedia('(prefers-color-scheme: dark)');
+monaco.editor.defineTheme("fitch-theme", prefersDark.matches ? theme : lightTheme);
+
+
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (ev: MediaQueryListEvent) => {
+  const isDark = ev.matches;
+  monaco.editor.defineTheme("fitch-theme", isDark ? theme : lightTheme);
+});
 
 const editor = monaco.editor.create(document.getElementById("editor"), {
   model: initModel,

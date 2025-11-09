@@ -3,6 +3,16 @@ import * as monaco from "monaco-editor";
 export const languagedef: monaco.languages.IMonarchLanguage = {
   tokenizer: {
     root: [
+
+      // Justifications - rule names
+      [
+        /..\b(Intro|Elim|Reit)\b/,
+        "justification.rule-name",
+      ],
+
+      // Line references in justifications (numbers, ranges)
+      [/:\s*\d+.*/, "justification.reference"],
+
       // Line numbers at start
       [/^\s*\d+/, "line-number"],
 
@@ -19,9 +29,7 @@ export const languagedef: monaco.languages.IMonarchLanguage = {
       [/∀/, "quantifier.universal"],
       [/∃/, "quantifier.existential"],
       [/⊥/, "operator.falsum"],
-      [/⊤/, "operator.verum"],
       [/=/, "operator.equality"],
-      [/≠/, "operator.inequality"],
 
       // Parentheses and brackets
       [/[()[\]{}]/, "delimiter"],
@@ -35,16 +43,7 @@ export const languagedef: monaco.languages.IMonarchLanguage = {
       // Function applications like f(a), g(x,y)
       [/[a-z]+(?=\()/, "function"],
 
-      // Justifications - rule names
-      [
-        /\b(Reit|∧\s*Elim|∨\s*Elim|∧\s*Intro|∨\s*Intro|→\s*Elim|→\s*Intro|¬\s*Elim|¬\s*Intro|=\s*Elim|=\s*Intro|∀\s*Elim|∀\s*Intro|∃\s*Elim|∃\s*Intro|⊥\s*Elim|RAA|MT|DS|HS|Add|Simp|Conj|MP|DeM|DN|Com|Assoc|Dist|Exp|Equiv|Impl|Taut|Contra)\b/,
-        "rule-name",
-      ],
 
-      // Line references in justifications (numbers, ranges)
-      [/:\s*\d+/, "justification.reference"],
-      [/\d+-\d+/, "justification.reference"],
-      [/,\s*\d+/, "justification.reference"],
 
       // Comma separator
       [/,/, "delimiter"],
@@ -72,23 +71,59 @@ export const theme: monaco.editor.IStandaloneThemeData = {
       fontStyle: "bold",
     },
     { token: "operator.falsum", foreground: "FF4444", fontStyle: "bold" },
-    { token: "operator.verum", foreground: "44FF44", fontStyle: "bold" },
     { token: "operator.equality", foreground: "CC6666", fontStyle: "bold" },
-    { token: "operator.inequality", foreground: "CC6666", fontStyle: "bold" },
     { token: "quantifier.universal", foreground: "9966CC", fontStyle: "bold" },
     {
       token: "quantifier.existential",
       foreground: "9966CC",
       fontStyle: "bold",
     },
+    { token: "justification.rule-name", foreground: "FF9966", fontStyle: "italic" },
+    { token: "justification.reference", foreground: "FF9966", fontStyle: "italic" },
     { token: "predicate", foreground: "99CC99" },
     { token: "function", foreground: "CCCC66" },
     { token: "variable", foreground: "99CCFF" },
-    { token: "rule-name", foreground: "FF9966", fontStyle: "italic" },
-    { token: "justification.reference", foreground: "CCCCCC" },
     { token: "delimiter", foreground: "#87875f" },
   ],
   colors: {
     "editor.background": "#1e1e1e",
   },
+};
+
+
+export const lightTheme: monaco.editor.IStandaloneThemeData = {
+  base: "vs",
+  inherit: true,
+  rules: [
+    { token: "line-number", foreground: "888888", fontStyle: "bold" },
+    { token: "proof-structure", foreground: "888888" },
+    { token: "operator.conjunction", foreground: "CC3333", fontStyle: "bold" },
+    { token: "operator.disjunction", foreground: "CC3333", fontStyle: "bold" },
+    { token: "operator.negation", foreground: "CC3333", fontStyle: "bold" },
+    { token: "operator.implication", foreground: "CC3333", fontStyle: "bold" },
+    {
+      token: "operator.biconditional",
+      foreground: "CC3333",
+      fontStyle: "bold",
+    },
+    { token: "operator.falsum", foreground: "DD0000", fontStyle: "bold" },
+    { token: "operator.verum", foreground: "00AA00", fontStyle: "bold" },
+    { token: "operator.equality", foreground: "CC3333", fontStyle: "bold" },
+    { token: "operator.inequality", foreground: "CC3333", fontStyle: "bold" },
+    { token: "quantifier.universal", foreground: "7744AA", fontStyle: "bold" },
+    {
+      token: "quantifier.existential",
+      foreground: "7744AA",
+      fontStyle: "bold",
+    },
+    { token: "predicate", foreground: "338833" },
+    { token: "function", foreground: "997700" },
+    { token: "variable", foreground: "0066CC" },
+    { token: "justification.rule-name", foreground: "666666", fontStyle: "italic" },
+    { token: "justification.reference", foreground: "666666" },
+    { token: "delimiter", foreground: "#6b6b4a" },
+  ],
+  colors: {
+    "editor.background": "#f5f5f5",
+  }
 };
