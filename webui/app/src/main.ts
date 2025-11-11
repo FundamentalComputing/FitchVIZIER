@@ -3,7 +3,6 @@ import "@fontsource-variable/fira-code";
 // import "./style.css";
 import {
   export_to_latex,
-  init,
 } from "@workspace/library";
 import * as monaco from "monaco-editor";
 import { tsParticles } from "@tsparticles/engine";
@@ -181,7 +180,6 @@ Alpine.effect(() => {
   editor.setModel(monaco.editor.getModels()[current]);
 });
 
-await init();
 window.addEventListener('storage', () => loadFromLocalStorage(), false); // listen for changes from other tabs
 loadFromLocalStorage();
 const current = Alpine.store("tabs").current;

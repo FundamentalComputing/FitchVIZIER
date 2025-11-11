@@ -18,7 +18,7 @@ jobs:
       # with:
       #   version: 10
     - name: Run Linter
-      working-directory: ./fitch-proof/packages/app
+      working-directory: ./webui/app
       run: pnpm install && pnpm lint
     - name: Run tests
       run: cargo test --verbose --manifest-path fitch-proof/Cargo.toml
