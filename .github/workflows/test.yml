@@ -20,5 +20,8 @@ jobs:
     - name: Run Linter
       working-directory: ./webui/app
       run: pnpm install && pnpm lint
-    - name: Run tests
+
+    - name: Run unit tests
       run: cargo test --verbose --manifest-path fitch-proof/Cargo.toml
+    - name: Run integration tests
+      run: cargo test --verbose --manifest-path cli/Cargo.toml
