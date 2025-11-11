@@ -9,7 +9,7 @@
     "dist"
   ],
   "scripts": {
-    "build": "vite build"
+    "build": "wasm-pack build --out-dir ../webui/library/wasm --out-name index ../../fitch-proof && vite build"
   },
   "dependencies": {
     "typescript": "~5.8.3",

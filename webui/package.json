@@ -3,5 +3,10 @@
   "devDependencies": {
     "eslint": "^9.36.0",
     "jiti": "^2.5.1"
+  },
+  "scripts": {
+    "build:library": "pnpm --filter library run build",
+    "build:app": "pnpm --filter app run build",
+    "build": "pnpm build:library && pnpm build:app"
   }
 }
