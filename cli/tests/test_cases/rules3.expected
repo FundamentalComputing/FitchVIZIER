@@ -1,0 +1,5 @@
+Line 4: the justification ∧Elim: 1 is used, but the top-level connective of line 1 is not a conjunction.
+
+Line 5: the justification ∧Elim: 2 is used, but none of the conjuncts in line 2 is identical to the sentence found in line 5.
+
+Line 8: the justification ∧Elim: 3 is used, but none of the conjuncts in line 3 is identical to the sentence found in line 8.

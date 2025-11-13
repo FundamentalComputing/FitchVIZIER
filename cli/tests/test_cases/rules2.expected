@@ -1,0 +1,8 @@
+Line 3: the rule ∧Intro is used, but the 1'th conjunct of the sentence in that line is not the same as the sentence found in line 2 (the 1'th line referenced in the justification).
+
+Line 5: the rule ∧Intro is used, but the number of conjuncts (3) of the sentence in line 5 is not equal to the number of referenced proof lines (2).
+
+Line 6: the rule ∧Intro is used, but the number of conjuncts (2) of the sentence in line 6 is not equal to the number of referenced proof lines (3).
+
+Line 7: the justification ∧Intro is used, but the top-level connective of this line is not ∧.
+

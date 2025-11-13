@@ -1,0 +1,5 @@
+Error: it seems like you use the name 'b' both to denote a constant, and to denote a function symbol
+
+Line 1: this line contains unbound variables.
+
+Line 2: you can only quantify over a variable, not over a constant.

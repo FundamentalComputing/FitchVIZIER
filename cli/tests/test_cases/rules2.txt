@@ -1,0 +1,8 @@
+1 | P(a)
+2 | P(b)
+  |--
+3 | P(a) ∧ P(a)   ∧Intro:2,2
+4 | P(b) ∧ P(b) ∧ P(b)  ∧Intro:2,2,2
+5 | P(b) ∧ P(b) ∧ P(b)  ∧Intro:2,2
+6 | P(b) ∧ (P(b) ∧ P(b))  ∧Intro:2,2,2
+7 | P(a) → P(b)  ∧Intro:1,2

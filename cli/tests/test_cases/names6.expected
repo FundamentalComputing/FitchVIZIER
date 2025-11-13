@@ -1,0 +1,3 @@
+Error: it seems like 'f' is meant to denote a function symbol, but throughout the proof, its arity is inconsistent. The found arities are [1, 2]
+
+Line 1: you cannot have a function called x, because x is a reserved name for variables.

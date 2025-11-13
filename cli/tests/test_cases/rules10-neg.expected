@@ -1,0 +1,15 @@
+Line 6: ¬Intro is used, but the last sentence in the referenced subproof is not ⊥.
+
+Line 7: the referenced subproof 8-9 is not in the scope of line 7, or it does not exist.
+
+Line 11: ¬Intro is used, but the negation of the premise of the referenced subproof does not match this line.
+
+Line 12: ¬Intro is used, but the top-level connective of the sentence in this line is not ¬.
+
+Line 15: ¬Intro is used, but the referenced subproof is not of the proper form. You cannot use ¬Intro on a subproof that introduces a boxed constant.
+
+Line 19: ¬Elim is used improperly
+
+Line 20: ¬Elim is used improperly
+
+Line 22: ¬Elim can only be used to go from ¬¬P to P, not the other way around

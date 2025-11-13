@@ -1,0 +1,5 @@
+Error: it seems like 'P' is meant to denote a predicate, but throughout the proof, its arity is inconsistent. The found arities are [1, 2]
+
+Error: it seems like you use the name 'Q' both to denote a nullary predicate ('no inputs'), and to denote a non-nullary predicate
+
+Line 7: the referenced subproof 6-4 is not in the scope of line 7, or it does not exist.

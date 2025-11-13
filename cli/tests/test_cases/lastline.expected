@@ -1,0 +1,3 @@
+Line 5: last line of proof should not be inside subproof
+
+Line 5: the referenced subproof 3-5 is not in the scope of line 5, or it does not exist.

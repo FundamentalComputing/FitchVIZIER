@@ -1,0 +1,19 @@
+Line 2: it is not allowed to use a boxed constant outside the subproof that defines it
+
+Line 3: it is not allowed to use a boxed constant outside the subproof that defines it
+
+Line 6: it is not allowed to use a boxed constant outside the subproof that defines it
+
+Line 7: line 4 is referenced in the justification, but this is not allowed, because line 4 is inside an already closed subproof.
+
+Line 8: ∨Elim is used, but not all referenced subproofs end with the same sentence as the sentence in line 8.
+
+Line 9: ∨Elim: 1, ..... is used, but the top-level connective of the sentence at line 1 is not ∨.
+
+Line 10: the rule ∨Elim: 3, ..... is used, but the number of disjuncts (3) of the sentence in line 3 is not equal to the number of referenced subproofs (2).
+
+Line 11: ∨Elim is used, but not all referenced subproofs end with the same sentence as the sentence in line 11.
+
+Line 12: ∨Elim: 2, ..... is used, but the premise of one of the referenced subproofs does not match the corresponding disjunct of the sentence at line 2. Note that the subproofs should be referenced in the order in which their corresponding premises appear as disjuncts in the sentence at line 2.
+
+Line 15: when using ∨Elim, you cannot reference subproofs which introduce a boxed constant.

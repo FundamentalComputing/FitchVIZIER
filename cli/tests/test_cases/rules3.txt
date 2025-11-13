@@ -1,0 +1,9 @@
+1 | P(a)
+2 | P(b) ∧ P(c)
+3 | P(a) ∧ P(b) ∧ P(c)
+  |--
+4 | P(a)  ∧Elim:1
+5 | P(a)  ∧Elim:2
+6 | P(b)  ∧Elim:2
+7 | P(b)  ∧Elim:3
+8 | P(k)  ∧Elim:3

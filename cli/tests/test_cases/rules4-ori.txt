@@ -1,0 +1,9 @@
+1 | P(a)
+2 | P(b) ∨ P(c)
+3 | P(a) ∧ (P(b) ∨ P(c))
+  |--
+4 | P(a) ∨ P(b)  ∨Intro:1
+5 | P(b) ∨ P(a) ∨ P(c) ∨ P(k)  ∨Intro:1
+6 | P(a) ∨ P(b) ∨ P(c)  ∨Intro:1
+7 | P(c) ∨ P(b) ∨Intro:3
+8 | P(k) ∨Intro:7

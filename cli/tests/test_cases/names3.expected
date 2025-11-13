@@ -1,0 +1,3 @@
+Line 7: the rule ∀Intro:2-6 is used, but if all occurrences of x in the quantified part of line 7 are replaced by a, one does not obtain the sentence in line 6
+
+Line 7: this line contains two nested quantifiers over the same variable.

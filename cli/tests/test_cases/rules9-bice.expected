@@ -1,0 +1,6 @@
+Line 9: the rule ↔Elim is wrongly used.
+
+Line 10: the rule ↔Elim is wrongly used.
+
+Line 11: the rule ↔Elim: 1, 8 is used, but the top-level connective of line 1 is not a bi-implication.
+

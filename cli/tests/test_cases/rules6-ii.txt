@@ -1,0 +1,20 @@
+1 | P(a)
+2 | P(a) → P(b)
+  |--
+3 | P(c)  →Intro:1-2
+4 | P(b) → P(a) →Intro:5-6
+5 | | P(b)
+  | |--
+6 | | P(a) Reit:1
+7 | P(b) → P(a) →Intro:5-6
+8 | P(a) → P(a) →Intro:5-6
+9 | P(b) → P(b) →Intro:5-6
+10| P(a) → P(b) →Intro:5-6
+11| | [c]
+  | |--
+12| | | P(c)
+  | | |--
+13| | | P(c) Reit:12
+14| | P(c) → P(c)  →Intro:12-13
+15| ∀ x (P(x) → P(x))  ∀Intro: 11-14
+16| P(x) → P(x) →Intro:11-14
