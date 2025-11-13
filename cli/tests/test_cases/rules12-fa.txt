@@ -1,0 +1,29 @@
+1  | P(a)
+2  | ∀x ∀y Q(a,b)
+3  | ∀y Q(a,y)
+4  | B
+   |----
+5  | | A
+   | |----
+6  | | P(a)             Reit: 1
+   |
+7  | | [c]
+   | |----
+8  | | P(a)             Reit: 1
+   |
+9  | | [c]
+   | |----
+10 | | ∀x ∀ y Q(a,b)           Reit: 2
+   |
+11 | | [c] P(c)
+   | |----
+12 | | ∀x ∀ y Q(a,b)           Reit: 2
+   |
+13 | ∀x P(a)            ∀ Intro: 7-8
+14 | ∀x P(a)            ∀ Intro: 5-6
+15 | ∀x P(a)            ∀ Intro: 9-10
+16 | ∀x P(a)            ∀ Intro: 11-12
+17 | ∀x P(x)            ∀ Intro: 7-8
+18 | Q(a,b)   ∀Elim:3
+19 | Q(a,b)   ∀Elim:4
+20 | Q(b,a)   ∀Elim:3

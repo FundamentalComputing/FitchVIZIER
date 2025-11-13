@@ -1,0 +1,11 @@
+Line 14: the rule ∀Intro is used, but the referenced subproof does not introduce a boxed constant
+
+Line 15: the rule ∀Intro:9-10 is used, but if all occurrences of x in the quantified part of line 15 are replaced by c, one does not obtain the sentence in line 10
+
+Line 16: when using ∀Intro, the premise of the referenced subproof should consist of solely a boxed constant, without a sentence
+
+Line 17: the rule ∀Intro:7-8 is used, but if all occurrences of x in the quantified part of line 17 are replaced by c, one does not obtain the sentence in line 8
+
+Line 19: the justification ∀Elim:4 is used, but the sentence at line 4 is not a universally quantified sentence at the top level
+
+Line 20: the rule ∀Elim:3 is used, but there is no appropriate substitution between line 3 and line 20
