@@ -2407,7 +2407,7 @@ fn test_exists_intro_needs_exists() {
     assert!(proof_is_not_correct_ultra_pedantic(proof));
 }
 #[test]
-fn test_complex_forall_elim_1(){
+fn test_complex_forall_elim_1() {
     let proof = "
 1 | ∀x∀y P(x,x,y,y,a)
   |----
@@ -2416,7 +2416,7 @@ fn test_complex_forall_elim_1(){
     assert!(proof_is_correct_ultra_pedantic(proof));
 }
 #[test]
-fn test_complex_forall_elim_2(){
+fn test_complex_forall_elim_2() {
     let proof = "
 1 | ∀x∀y P(x,x,y,y,a)
   |----
@@ -2425,7 +2425,7 @@ fn test_complex_forall_elim_2(){
     assert!(proof_is_not_correct_ultra_pedantic(proof));
 }
 #[test]
-fn test_complex_forall_elim_3(){
+fn test_complex_forall_elim_3() {
     let proof = "
 1 | ∀x∀y P(x,x,y,y,a)
   |----
@@ -2434,7 +2434,7 @@ fn test_complex_forall_elim_3(){
     assert!(proof_is_not_correct_ultra_pedantic(proof));
 }
 #[test]
-fn test_complex_forall_elim_4(){
+fn test_complex_forall_elim_4() {
     let proof = "
 1 | ∀x∀y P(x,x,y,y,a)
   |----
@@ -2443,7 +2443,7 @@ fn test_complex_forall_elim_4(){
     assert!(proof_is_not_correct_ultra_pedantic(proof));
 }
 #[test]
-fn test_complex_forall_elim_5(){
+fn test_complex_forall_elim_5() {
     let proof = "
 1 | ∀x∀y P(x,x,y,y,a)
   |----
@@ -2452,7 +2452,7 @@ fn test_complex_forall_elim_5(){
     assert!(proof_is_not_correct_ultra_pedantic(proof));
 }
 #[test]
-fn test_complex_forall_elim_6(){
+fn test_complex_forall_elim_6() {
     let proof = "
 1 | ∀x∀y P(x,x,y,y,a)
   |----
@@ -2461,7 +2461,7 @@ fn test_complex_forall_elim_6(){
     assert!(proof_is_not_correct_ultra_pedantic(proof));
 }
 #[test]
-fn test_exists_elim_1(){
+fn test_exists_elim_1() {
     let proof = "
 1 | ∃x ⊥
   |----
@@ -2473,7 +2473,7 @@ fn test_exists_elim_1(){
     assert!(proof_is_correct_ultra_pedantic(proof));
 }
 #[test]
-fn test_exists_elim_2(){
+fn test_exists_elim_2() {
     let proof = "
 1 | ∃x P
   |----
@@ -2485,7 +2485,7 @@ fn test_exists_elim_2(){
     assert!(proof_is_not_correct_ultra_pedantic(proof));
 }
 #[test]
-fn test_exists_elim_3(){
+fn test_exists_elim_3() {
     let proof = "
 1 | ∃x P
   |----
@@ -2497,7 +2497,7 @@ fn test_exists_elim_3(){
     assert!(proof_is_correct_ultra_pedantic(proof));
 }
 #[test]
-fn test_exists_elim_4(){
+fn test_exists_elim_4() {
     let proof = "
 1 | ∃x P(x)
   |----
@@ -2509,7 +2509,7 @@ fn test_exists_elim_4(){
     assert!(proof_is_not_correct_ultra_pedantic(proof));
 }
 #[test]
-fn test_exists_elim_5(){
+fn test_exists_elim_5() {
     let proof = "
 1 | ∃x P(x)
   |----
@@ -2522,7 +2522,7 @@ fn test_exists_elim_5(){
     assert!(proof_is_correct_ultra_pedantic(proof));
 }
 #[test]
-fn test_exists_elim_6(){
+fn test_exists_elim_6() {
     let proof = "
 1 | ∃x P(x)
   |----
@@ -2535,7 +2535,7 @@ fn test_exists_elim_6(){
     assert!(proof_is_not_correct_ultra_pedantic(proof));
 }
 #[test]
-fn test_exists_elim_7(){
+fn test_exists_elim_7() {
     let proof = "
 1 | ∃x P(x)
   |----
@@ -2548,7 +2548,7 @@ fn test_exists_elim_7(){
     assert!(proof_is_not_correct_ultra_pedantic(proof));
 }
 #[test]
-fn test_exists_elim_8(){
+fn test_exists_elim_8() {
     let proof = "
 1 | ∃x ∃y P(x,x,y,y)
   |----
@@ -2564,7 +2564,7 @@ fn test_exists_elim_8(){
     assert!(proof_is_correct_ultra_pedantic(proof));
 }
 #[test]
-fn test_exists_elim_9(){
+fn test_exists_elim_9() {
     let proof = "
 1 | ∃x ∃y P(x,x,y,y)
   |----
@@ -2580,7 +2580,7 @@ fn test_exists_elim_9(){
     assert!(proof_is_not_correct_ultra_pedantic(proof));
 }
 #[test]
-fn test_exists_elim_10(){
+fn test_exists_elim_10() {
     let proof = "
 1 | ∃x ∃y P(x,x,y,y)
   |----

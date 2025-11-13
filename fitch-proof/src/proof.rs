@@ -1,4 +1,5 @@
 use crate::data::*;
+use crate::loc::WithLoc;
 use std::collections::HashSet;
 
 /// [Scope] is a type which stores scoping information (like which lines can reference which
@@ -27,7 +28,7 @@ pub type Scope = Vec<(Vec<usize>, Vec<(usize, usize)>)>;
 /// the full correctness of a [Proof], use [Proof::is_fully_correct].
 pub struct Proof {
     ///  the unified sequence of proof nodes that encode numbered lines and structural markers.
-    pub nodes: Vec<ProofNode>,
+    pub nodes: Vec<LProofNode>,
     ///  a field that contains the [Scope] of the proof (it contains information which lines may
     /// reference which lines)
     pub scope: Scope,
@@ -36,31 +37,39 @@ pub struct Proof {
 }
 
 impl Proof {
-    fn normalize_nodes(raw_nodes: Vec<ProofNode>) -> Result<Vec<ProofNode>, String> {
-        let mut normalized: Vec<ProofNode> = Vec::with_capacity(raw_nodes.len() * 2);
+    fn normalize_nodes(raw_nodes: Vec<LProofNode>) -> Result<Vec<LProofNode>, String> {
+        let mut normalized: Vec<LProofNode> = Vec::with_capacity(raw_nodes.len() * 2);
         let mut prev_depth = 1;
         let mut last_line_num = 0;
 
         for node in raw_nodes {
-            if matches!(node, ProofNode::SubproofOpen { .. } | ProofNode::SubproofClose { .. }) {
+            if matches!(
+                node.value(),
+                ProofNode::SubproofOpen { .. } | ProofNode::SubproofClose { .. }
+            ) {
                 return Err("internal error: proof already contains structural markers".to_string());
             }
 
-            let depth = node.depth();
-
+            let depth = node.value().depth();
             if depth == prev_depth + 1 {
-                normalized.push(ProofNode::SubproofOpen {
-                    depth,
-                });
+                normalized.push(WithLoc::new(
+                    ProofNode::SubproofOpen {
+                        depth,
+                    },
+                    node.location.clone(),
+                ));
             } else if depth + 1 == prev_depth {
-                normalized.push(ProofNode::SubproofClose {
-                    depth: prev_depth,
-                });
+                normalized.push(WithLoc::new(
+                    ProofNode::SubproofClose {
+                        depth: prev_depth,
+                    },
+                    node.location.clone(),
+                ));
             } else if depth != prev_depth {
                 return Err(format!("near line {}, there is an 'indentation/scope jump' that is too big. You cannot open or close two subproofs in the same line.", last_line_num + 1));
             }
 
-            if let ProofNode::Numbered(ref numbered) = node {
+            if let ProofNode::Numbered(numbered) = node.value() {
                 last_line_num = numbered.line_num;
             }
 
@@ -77,41 +86,45 @@ impl Proof {
     /// [Proof::construct]ing the proof, you should [Proof::is_fully_correct]() it. The combination of these two things
     /// allows you to assess the correctness of a proof.
     pub fn construct(
-        raw_nodes: Vec<ProofNode>,
+        raw_nodes: Vec<LProofNode>,
         allowed_variable_names: HashSet<String>,
     ) -> Result<Proof, String> {
         let nodes = Self::normalize_nodes(raw_nodes)?;
         Self::is_half_well_structured(&nodes)?;
         let scope = Self::determine_scope(&nodes);
 
-        Ok(Proof { nodes, scope, allowed_variable_names })
+        Ok(Proof {
+            nodes,
+            scope,
+            allowed_variable_names,
+        })
     }
 
-    pub fn nodes(&self) -> &[ProofNode] {
+    pub fn nodes(&self) -> &[LProofNode] {
         &self.nodes
     }
 
     pub fn numbered_lines(&self) -> impl Iterator<Item = &NumberedLine> {
-        self.nodes.iter().filter_map(|node| node.as_numbered())
+        self.nodes.iter().filter_map(|node| node.value().as_numbered())
     }
 
     pub fn find_numbered_line(&self, line_num: usize) -> Option<&NumberedLine> {
-        self.nodes.iter().find_map(|node| match node {
+        self.nodes.iter().find_map(|node| match node.value() {
             ProofNode::Numbered(line) if line.line_num == line_num => Some(line),
             _ => None,
         })
     }
 
     pub fn last_numbered_line(&self) -> Option<&NumberedLine> {
-        self.nodes.iter().rev().find_map(|node| node.as_numbered())
+        self.nodes.iter().rev().find_map(|node| node.value().as_numbered())
     }
 
     /// This function computes the [Scope] of a proof.
     /// This function computes the [Scope] of a proof.
-    fn determine_scope(nodes: &[ProofNode]) -> Scope {
+    fn determine_scope(nodes: &[LProofNode]) -> Scope {
         let last_line_number: usize = nodes
             .iter()
-            .filter_map(|node| match node {
+            .filter_map(|node| match node.value() {
                 ProofNode::Numbered(line) => Some(line.line_num),
                 _ => None,
             })
@@ -120,7 +133,7 @@ impl Proof {
         let mut scope: Scope = vec![(vec![], vec![]); last_line_number + 1];
 
         for (idx, node) in nodes.iter().enumerate() {
-            let Some(line) = node.as_numbered() else {
+            let Some(line) = node.value().as_numbered() else {
                 continue;
             };
             if !line.is_inference() {
@@ -131,7 +144,7 @@ impl Proof {
             let mut stack: Vec<usize> = vec![];
 
             for j in (0..idx).rev() {
-                match &nodes[j] {
+                match nodes[j].value() {
                     ProofNode::SubproofOpen {
                         ..
                     } => {
@@ -139,7 +152,7 @@ impl Proof {
                             depth -= 1;
                             let subproof_begin = nodes[j + 1..]
                                 .iter()
-                                .find_map(|node| node.as_numbered())
+                                .find_map(|node| node.value().as_numbered())
                                 .map(|premise| premise.line_num)
                                 .expect("This really should not happen. This is a mistake by the developer. Please contact me if you get this.");
                             let subproof_end = stack.pop().expect("This is a mistake by the developer. Please contact me if you get this.");
@@ -155,7 +168,7 @@ impl Proof {
                         let subproof_end = nodes[..j]
                             .iter()
                             .rev()
-                            .find_map(|node| node.as_numbered())
+                            .find_map(|node| node.value().as_numbered())
                             .map(|last_line| last_line.line_num)
                             .expect("This really should not happen. This is a mistake by the developer. Please contact me if you get this.");
                         stack.push(subproof_end);
@@ -193,14 +206,14 @@ impl Proof {
     /// basically allow the user to not write a justification for the time being. In that case it
     /// will be parsed as a premise, so that's why we allow premises. This function won't complain
     /// about it, but of course, this will be checked when the proof is assessed for full correctness.
-    fn is_half_well_structured(nodes: &[ProofNode]) -> Result<(), String> {
+    fn is_half_well_structured(nodes: &[LProofNode]) -> Result<(), String> {
         // traverse the structural nodes to check validity of the proof
         // basically, for each node, we check that the nodes after that are allowed.
 
         // Helper function for grabbing the next non-empty line
-        fn next_meaningful(nodes: &[ProofNode], mut idx: usize) -> Option<usize> {
+        fn next_meaningful(nodes: &[LProofNode], mut idx: usize) -> Option<usize> {
             while idx < nodes.len() {
-                if !matches!(nodes[idx], ProofNode::Empty { .. }) {
+                if !matches!(nodes[idx].value(), ProofNode::Empty { .. }) {
                     return Some(idx);
                 }
                 idx += 1;
@@ -214,7 +227,7 @@ impl Proof {
         };
 
         // a proof can start with a fitch bar or with a numbered premise
-        match &nodes[first_idx] {
+        match nodes[first_idx].value() {
             ProofNode::FitchBar {
                 ..
             } => {}
@@ -226,7 +239,7 @@ impl Proof {
         }
 
         for i in 0..nodes.len() {
-            match &nodes[i] {
+            match nodes[i].value() {
                 ProofNode::Empty {
                     ..
                 } => {}
@@ -235,14 +248,14 @@ impl Proof {
                 //  - an inference
                 //  - a premise without boxed constant (inference for which the user didn't write justification yet)
                 //  - a new subproof
-                //    and a proof must NOT end with a Fitch bar line       
+                //    and a proof must NOT end with a Fitch bar line
                 ProofNode::FitchBar {
                     ..
                 } => {
                     let Some(next_idx) = next_meaningful(nodes, i + 1) else {
                         return Err("The proof ends with a Fitch bar.".to_string());
                     };
-                    match &nodes[next_idx] {
+                    match nodes[next_idx].value() {
                         ProofNode::Numbered(line) if line.is_inference() => {}
                         ProofNode::SubproofOpen {
                             ..
@@ -263,7 +276,7 @@ impl Proof {
                     let Some(prem_idx) = next_meaningful(nodes, i + 1) else {
                         return Err("Error: this proof ends with an opened subproof in a way that should not be.".to_string());
                     };
-                    match &nodes[prem_idx] {
+                    match nodes[prem_idx].value() {
                         ProofNode::Numbered(line) if !line.is_inference() => {}
                         _ => {
                             return Err(
@@ -275,7 +288,7 @@ impl Proof {
                     let Some(bar_idx) = next_meaningful(nodes, prem_idx + 1) else {
                         return Err("Error: this proof ends with an opened subproof in a way that should not be.".to_string());
                     };
-                    match &nodes[bar_idx] {
+                    match nodes[bar_idx].value() {
                         ProofNode::FitchBar {
                             ..
                         } => {}
@@ -293,7 +306,7 @@ impl Proof {
                     ..
                 } => {
                     if let Some(next_idx) = next_meaningful(nodes, i + 1) {
-                        match &nodes[next_idx] {
+                        match nodes[next_idx].value() {
                             ProofNode::Numbered(line) if line.is_inference() => {}
                             ProofNode::SubproofOpen {
                                 ..
@@ -307,17 +320,14 @@ impl Proof {
                     }
                 }
 
-
-                   // in HALF-well-structured proofs, after an inference there should be either:
-                   //  - the end of the subproof
-                   //  - the opening of a new subproof
-                   //  - another inference
-                   //  - a premise without boxed constant (i.e. in this case an inference without justification)
-                ProofNode::Numbered(line)
-                    if line.is_inference() =>
-                {
+                // in HALF-well-structured proofs, after an inference there should be either:
+                //  - the end of the subproof
+                //  - the opening of a new subproof
+                //  - another inference
+                //  - a premise without boxed constant (i.e. in this case an inference without justification)
+                ProofNode::Numbered(line) if line.is_inference() => {
                     if let Some(next_idx) = next_meaningful(nodes, i + 1) {
-                        match &nodes[next_idx] {
+                        match nodes[next_idx].value() {
                             ProofNode::Numbered(next_line) if next_line.is_inference() => {}
                             ProofNode::SubproofOpen {
                                 ..
@@ -357,7 +367,7 @@ impl Proof {
                     if !line.is_inference() && !line.introduces_boxed_constant() =>
                 {
                     if let Some(next_idx) = next_meaningful(nodes, i + 1) {
-                        match &nodes[next_idx] {
+                        match nodes[next_idx].value() {
                             ProofNode::FitchBar {
                                 ..
                             } => {}
@@ -381,17 +391,15 @@ impl Proof {
                         }
                     }
                 }
-                
+
                 // in HALF-well-structured proofs, after a premise with b.c. there must be:
                 //  - a Fitch bar line
                 //    and a proof MUST NOT end directly after a premise with b.c.
-                ProofNode::Numbered(line)
-                    if line.introduces_boxed_constant() =>
-                {
+                ProofNode::Numbered(line) if line.introduces_boxed_constant() => {
                     let Some(next_idx) = next_meaningful(nodes, i + 1) else {
                         return Err("Error: a proof cannot end with a premise.".to_owned());
                     };
-                    match &nodes[next_idx] {
+                    match nodes[next_idx].value() {
                         ProofNode::FitchBar {
                             ..
                         } => {}
@@ -410,7 +418,7 @@ impl Proof {
         // they must start at 1 and increase in steps of 1
         let mut prev_num: usize = 0;
         for node in nodes.iter() {
-            if let ProofNode::Numbered(line) = node {
+            if let ProofNode::Numbered(line) = node.value() {
                 if line.line_num != prev_num + 1 {
                     return Err(format!(
                         "Line numbers are wrong; discrepancy between line {prev_num} and {num}...",

@@ -16,12 +16,12 @@ use std::collections::HashMap;
 ///
 /// If the proof contains justifications which have line numbers that do not exist in the proof,
 /// these line numbers will be set to zero in the justification.
-pub fn fix_line_numbers(proof_nodes: &mut [ProofNode]) {
+pub fn fix_line_numbers(proof_nodes: &mut [LProofNode]) {
     let mut line_num_map: HashMap<usize, usize> = HashMap::new();
     let mut next_line = 1usize;
 
     for node in proof_nodes.iter_mut() {
-        if let ProofNode::Numbered(line) = node {
+        if let ProofNode::Numbered(line) = node.value_mut() {
             line_num_map.insert(line.line_num, next_line);
             line.line_num = next_line;
             next_line += 1;
@@ -31,9 +31,10 @@ pub fn fix_line_numbers(proof_nodes: &mut [ProofNode]) {
     let remap = |n: &usize| *line_num_map.get(n).unwrap_or(&0);
 
     for node in proof_nodes.iter_mut() {
-        if let ProofNode::Numbered(line) = node {
-            if let Some(just) = &line.justification {
-                line.justification = Some(remap_justification(just, &remap));
+        if let ProofNode::Numbered(line) = node.value_mut() {
+            if let Some(just) = line.justification_with_loc() {
+                line.justification =
+                    Some(dummy_ljustification(remap_justification(just.value(), &remap)));
             }
         }
     }

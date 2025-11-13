@@ -4,11 +4,13 @@ mod data;
 mod export_to_latex;
 mod fix_line_numbers;
 mod formatter;
+mod loc;
 mod parser;
 mod proof;
 mod util;
+use crate::data::{wrap_nodes_with_dummy_locations, ProofResult, Wff};
 pub use crate::data::{Justification, NumberedLine, ProofNode};
-use crate::data::{ProofResult, Wff};
+pub use crate::loc::{Location, WithLoc};
 pub use parser::parse_fitch_proof;
 
 macro_rules! default_variable_names {
@@ -71,7 +73,10 @@ fn check_proof_to_proofresult(proof: &str, allowed_variable_names: &str) -> Proo
         parser::parse_fitch_proof(proof),
         parser::parse_allowed_variable_names(allowed_variable_names),
     ) {
-        (Ok(proof_nodes), Ok(variable_names)) => checker::check_proof(proof_nodes, variable_names),
+        (Ok(proof_nodes), Ok(variable_names)) => {
+            let located = wrap_nodes_with_dummy_locations(proof_nodes);
+            checker::check_proof(located, variable_names)
+        }
         (Err(err), _) | (_, Err(err)) => ProofResult::FatalError(err),
     }
 }
@@ -100,7 +105,8 @@ fn check_proof_to_proofresult_with_template(
             if template_wffs.len() != template.len() {
                 return ProofResult::FatalError("Some sentences in the template file could not be parsed. If you see this as a student on Themis, please contact the course staff as soon as possible; something is wrong on our side. Thanks!".to_owned());
             }
-            checker::check_proof_with_template(proof_nodes, template_wffs, variable_names)
+            let located = wrap_nodes_with_dummy_locations(proof_nodes);
+            checker::check_proof_with_template(located, template_wffs, variable_names)
         }
         (Err(err), _) | (_, Err(err)) => ProofResult::FatalError(err),
     }
@@ -122,7 +128,9 @@ pub fn proof_is_correct(proof: &str) -> bool {
 #[wasm_bindgen]
 pub fn format_proof(proof: &str) -> String {
     match parser::parse_fitch_proof(proof) {
-        Ok(nodes) if !nodes.is_empty() => formatter::format_proof(nodes),
+        Ok(nodes) if !nodes.is_empty() => {
+            formatter::format_proof(wrap_nodes_with_dummy_locations(nodes))
+        }
         _ => "invalid".to_string(),
     }
 }
@@ -136,9 +144,10 @@ pub fn format_proof(proof: &str) -> String {
 #[wasm_bindgen]
 pub fn fix_line_numbers_in_proof(proof: &str) -> String {
     match parser::parse_fitch_proof(proof) {
-        Ok(mut nodes) if !nodes.is_empty() => {
-            fix_line_numbers::fix_line_numbers(&mut nodes);
-            formatter::format_proof(nodes)
+        Ok(nodes) if !nodes.is_empty() => {
+            let mut located = wrap_nodes_with_dummy_locations(nodes);
+            fix_line_numbers::fix_line_numbers(&mut located);
+            formatter::format_proof(located)
         }
         _ => proof.to_owned(),
     }
@@ -147,7 +156,10 @@ pub fn fix_line_numbers_in_proof(proof: &str) -> String {
 #[wasm_bindgen]
 pub fn export_to_latex(proof: &str) -> String {
     match parser::parse_fitch_proof(proof) {
-        Ok(nodes) if !nodes.is_empty() => export_to_latex::proof_to_latex(&nodes),
+        Ok(nodes) if !nodes.is_empty() => {
+            let located = wrap_nodes_with_dummy_locations(nodes);
+            export_to_latex::proof_to_latex(&located)
+        }
         _ => "Failed to export to latex, because the proof could not be parsed or was empty."
             .to_string(),
     }

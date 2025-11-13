@@ -14,7 +14,7 @@ use std::iter::zip;
 /// but something like ∀a P(a) will not be accepted, because "a" is not listed as a string
 /// that should be seen as a variable.
 pub fn check_proof(
-    proof_nodes: Vec<ProofNode>,
+    proof_nodes: Vec<LProofNode>,
     allowed_variable_names: HashSet<String>,
 ) -> ProofResult {
     match Proof::construct(proof_nodes, allowed_variable_names) {
@@ -37,7 +37,7 @@ pub fn check_proof(
 /// but something like ∀a P(a) will not be accepted, because "a" is not listed as a string
 /// that should be seen as a variable.
 pub fn check_proof_with_template(
-    proof_nodes: Vec<ProofNode>,
+    proof_nodes: Vec<LProofNode>,
     template: Vec<Wff>,
     allowed_variable_names: HashSet<String>,
 ) -> ProofResult {
@@ -73,8 +73,8 @@ impl Proof {
                 .nodes
                 .iter()
                 .take_while(|node| !node.is_fitch_bar())
-                .filter_map(|node| match node {
-                    ProofNode::Numbered(line) => line.sentence.clone(),
+                .filter_map(|node| match node.value() {
+                    ProofNode::Numbered(line) => line.sentence().cloned(),
                     _ => None,
                 })
                 .collect();
@@ -90,8 +90,8 @@ impl Proof {
 
         // check conclusion
         {
-            let conclusion_in_proof = self.nodes.iter().rev().find_map(|node| match node {
-                ProofNode::Numbered(line) => line.sentence.as_ref(),
+            let conclusion_in_proof = self.nodes.iter().rev().find_map(|node| match node.value() {
+                ProofNode::Numbered(line) => line.sentence(),
                 _ => None,
             });
             match conclusion_in_proof {
@@ -146,7 +146,7 @@ impl Proof {
         let mut seen_fitch_bar = false;
         let mut premises_ok = true;
         for node in self.nodes() {
-            match node {
+            match node.value() {
                 ProofNode::FitchBar {
                     ..
                 } => {
@@ -179,15 +179,15 @@ impl Proof {
         // check that all variables are bound, that user doesn't have nested quantifiers over the
         // same variable and that users don't quantify over a constant, and that the user does not make
         // a function with the name of a variable
-        errors.extend(self.numbered_lines().filter(|line| line.sentence.is_some()).filter_map(
-            |line| {
-                self.check_variable_scoping_naming_issues(
-                    line.sentence.as_ref().unwrap(),
-                    line.line_num,
-                )
-                .err()
-            },
-        ));
+        errors.extend(self.numbered_lines().
+                      filter_map(|line| {
+                          match line.sentence() {
+                              None => None,
+                              Some(wff) =>
+                                  self.check_variable_scoping_naming_issues(wff, line.line_num)
+                                  .err()
+                          }
+                      }));
 
         // check that user does not use a symbol to denote both a constant and a function, and that
         // arities of function symbols are consistent throughout the proof.
@@ -202,7 +202,9 @@ impl Proof {
 
         // check that last line is top-level
         if self.last_line_is_inside_subproof() {
-            let lln = self.last_line_num();
+            // if the proof is empty the check above returns false
+            // so it is safe to unwrap the last_line_num
+            let lln = self.last_line_num().unwrap();
             errors.push(format!("Line {lln}: last line of proof should not be inside subproof"));
         }
 
@@ -221,7 +223,7 @@ impl Proof {
         let mut res = vec![]; // store what we're going to return
         let mut expect_justification = false;
         for node in self.nodes() {
-            match node {
+            match node.value() {
                 ProofNode::FitchBar {
                     ..
                 } => {
@@ -255,8 +257,8 @@ impl Proof {
     }
 
     /// This function returns the line number of the last sentence of the proof.
-    fn last_line_num(&self) -> usize {
-        self.last_numbered_line().map(|line| line.line_num).unwrap()
+    fn last_line_num(&self) -> Option<usize> {
+        self.last_numbered_line().map(|line| line.line_num)
     }
 
     /// This function checks that no boxed constants are used outside the subproof. If no boxed
@@ -267,41 +269,61 @@ impl Proof {
 
         // step 1: check which boxed constants exist within the proof
         let boxed_consts: HashSet<_> =
-            self.numbered_lines().filter_map(|line| line.boxed_constant.clone()).collect();
+            self.numbered_lines().filter_map(|line| line.boxed_constant_owned()).collect();
 
         // step 2: let's also give warnings if the user puts a variable in a box (not a constant)
         errors.extend(
             self.numbered_lines()
-                .filter(|line| line.boxed_constant.is_some())
                 .filter_map(|line| {
-                    if self.term_is_constant(line.boxed_constant.as_ref().unwrap().clone()) {
-                        None
-                    } else {
-                        Some(format!(
-                            "Line {}: a boxed constant cannot be a variable (should not have the name of a variable).",
-                            line.line_num
-                        ))
-                    }
+                    line.boxed_constant_owned().and_then(|bc| {
+                        if self.term_is_constant(bc) {
+                            None
+                        } else {
+                            Some(format!(
+                                "Line {}: a boxed constant cannot be a variable (should not have the name of a variable).",
+                                line.line_num
+                            ))
+                        }
+                    })
                 }),
         );
 
         // step 3: iterate over proof units and see if boxed constants only get used when allowed
-        // keep a stack of which boxed constants are in scope:
+        // e.g. not used outside the scope
+
+        // We keep a stack of which boxed constants are in scope. for
+        // simplicity we count all the opening scopes, even those that
+        // do not introduce new constants this is done to simplify the
+        // code: when a new scope is opened we push a boxed constant
+        // or None, depending on whether we introduce any new
+        // constants to the scope or not; then when we close the scope
+        // we *always* remove the top element from the stack,
+        // irregardles if any constants were introduced or not
         let mut currently_in_scope: Vec<Option<Term>> = vec![];
+
         for node in self.nodes() {
-            match node {
+            match node.value() {
                 ProofNode::FitchBar {
                     ..
                 } => {}
                 ProofNode::Numbered(line) if line.introduces_boxed_constant() => {
-                    let new_boxed_const = &line.boxed_constant;
                     // before we add the new variable to current scope,
                     // test if it was not already in scope:
-                    if currently_in_scope.contains(new_boxed_const) {
+                    let bc = line.boxed_constant_owned().expect(
+                        "Internal error: introduces_boxed_constant returned true but boxed_constant missing",
+                    );
+                    if currently_in_scope
+                        .iter()
+                        .filter_map(|opt| opt.as_ref())
+                        .any(|t| *t == bc)
+                    {
                         errors.push(format!("Line {}: you cannot introduce the same boxed constant twice in nested subproofs", line.line_num));
                     }
-                    currently_in_scope.push(new_boxed_const.clone());
-                    if let Some(wff) = &line.sentence {
+                    currently_in_scope.push(Some(bc));
+                    // if the line introducing a boxed constant also contains a formula
+                    // (for example, in ∃Elim), we check that the formula contains only valid
+                    // boxed constants in scope
+                    if let Some(wff) = line.sentence() {
                         if let Err(err) = check_wff_not_contain_out_of_scope_boxed_consts(
                             wff,
                             &currently_in_scope,
@@ -316,7 +338,7 @@ impl Proof {
                     if !line.is_inference() && !line.introduces_boxed_constant() =>
                 {
                     currently_in_scope.push(None);
-                    if let Some(wff) = &line.sentence {
+                    if let Some(wff) = line.sentence() {
                         if let Err(err) = check_wff_not_contain_out_of_scope_boxed_consts(
                             wff,
                             &currently_in_scope,
@@ -328,7 +350,7 @@ impl Proof {
                     }
                 }
                 ProofNode::Numbered(line) if line.is_inference() => {
-                    if let Some(wff) = &line.sentence {
+                    if let Some(wff) = line.sentence() {
                         if let Err(err) = check_wff_not_contain_out_of_scope_boxed_consts(
                             wff,
                             &currently_in_scope,
@@ -626,10 +648,12 @@ impl Proof {
                 Wff::And(li) | Wff::Or(li) => {
                     li.iter().flat_map(|t| get_arity_set_wff(proof, t)).collect()
                 }
-                Wff::Forall(_, w) | Wff::Exists(_, w) | Wff::Not(w) => get_arity_set_wff(proof, w),
+                Wff::Forall(_, w) | Wff::Exists(_, w) | Wff::Not(w) => {
+                    get_arity_set_wff(proof, w.value())
+                }
                 Wff::Bicond(w1, w2) | Wff::Implies(w1, w2) => get_arity_set_wff(proof, w1)
                     .into_iter()
-                    .chain(get_arity_set_wff(proof, w2))
+                    .chain(get_arity_set_wff(proof, w2.value()))
                     .collect(),
                 Wff::Equals(t1, t2) => get_arity_set_term(proof, t1)
                     .into_iter()
@@ -645,12 +669,12 @@ impl Proof {
             }
         }
         self.numbered_lines()
-            .filter_map(|line| line.sentence.as_ref())
+            .filter_map(|line| line.sentence_with_loc())
             .flat_map(|t| get_arity_set_wff(self, t))
             .chain(
                 // also include boxed constants in arity set!
-                self.numbered_lines().filter_map(|line| line.boxed_constant.as_ref()).map(|c| {
-                    match c {
+                self.numbered_lines().filter_map(|line| line.boxed_constant_with_loc()).map(|c| {
+                    match c.value() {
                         Term::Atomic(str) => (str.to_owned(), 0),
                         Term::FuncApp(..) => panic!("boxed constant cannot be FuncApp"),
                     }
@@ -680,7 +704,7 @@ impl Proof {
     ) -> Result<&Wff, String> {
         let line = self.find_numbered_line(requested_line);
         if let Some(l) = line {
-            if let Some(wff) = &l.sentence {
+            if let Some(wff) = l.sentence() {
                 if self.can_reference(referencing_line, requested_line) {
                     Ok(wff)
                 } else if requested_line < referencing_line {
@@ -696,9 +720,12 @@ impl Proof {
         }
     }
 
-    /// This function gets the subproof that runs from line `subproof_begin` to line
-    /// `subproof_end`. It will return either `Ok(())` if the subproof exists and is allowed to be
-    /// referenced from `referencing_line`. Otherwise, a relevant error message will be returned.
+    /// This function gets the premise and the conclusion of the
+    /// subproof that runs from line `subproof_begin` to line
+    /// `subproof_end`. It will return either `Ok(())` if the subproof
+    /// exists and is allowed to be referenced from
+    /// `referencing_line`. Otherwise, a relevant error message will
+    /// be returned.
     ///
     /// Example: if the requested subproof is inside an already closed subproof, then line
     /// `referencing_line` is not allowed to reference this subproof and an error message will be
@@ -736,15 +763,20 @@ impl Proof {
     ///
     /// Note that the provided [NumberedLine] should exist in the proof!
     fn check_line(&self, line: &NumberedLine) -> Result<(), String> {
-        // this function only checks lines that have a justification...
-        if line.justification.is_none() {
-            return Ok(());
-        }
-
         let curr_line_num = line.line_num;
 
-        let (curr_wff, just) =
-            (line.sentence.as_ref().unwrap(), line.justification.as_ref().unwrap());
+        // if there is no justification we skip
+        if line.justification().is_none() {
+            return Ok(());
+        }
+        let just = line.justification().unwrap();
+
+        // if there is no Wff then we should also skip 
+        if line.sentence().is_none() {
+            return Err(format!("Line: {curr_line_num}: no formula present"))
+        }
+        let curr_wff = line.sentence().unwrap();
+
         match just {
             Justification::Reit(n) => {
                 let ref_wff = self.get_wff_at_line(curr_line_num, *n)?;
@@ -771,7 +803,7 @@ impl Proof {
                         ));
                     }
                     for i in 0..ns.len() {
-                        if &conjs[i] != self.get_wff_at_line(curr_line_num, ns[i])? {
+                        if conjs[i].value() != self.get_wff_at_line(curr_line_num, ns[i])? {
                             return Err(format!(
                                 "Line {curr_line_num}: the rule ∧Intro is used, but the {}\'th \
                                 conjunct of the sentence in that line is not the same as \
@@ -794,7 +826,7 @@ impl Proof {
             Justification::AndElim(n) => {
                 let ref_wff = self.get_wff_at_line(curr_line_num, *n)?;
                 if let Wff::And(conjs) = ref_wff {
-                    if conjs.iter().any(|conj| conj == curr_wff) {
+                    if conjs.iter().any(|conj| conj.value() == curr_wff) {
                         Ok(())
                     } else {
                         Err(format!(
@@ -815,7 +847,7 @@ impl Proof {
             Justification::OrIntro(n) => {
                 let ref_wff = self.get_wff_at_line(curr_line_num, *n)?;
                 if let Wff::Or(disjs) = curr_wff {
-                    if disjs.iter().any(|disj| disj == ref_wff) {
+                    if disjs.iter().any(|disj| disj.value() == ref_wff) {
                         Ok(())
                     } else {
                         Err(format!(
@@ -853,16 +885,26 @@ impl Proof {
                 }
                 for (disj, subprf) in zip(disjs, subproofs) {
                     let (s_begin, s_end) = self.get_subproof_at_lines(curr_line_num, *subprf)?;
-                    let (Some(s_begin_wff), Some(s_end_wff), None) =
-                        (&s_begin.sentence, &s_end.sentence, &s_begin.boxed_constant)
-                    else {
+                    if s_begin.boxed_constant().is_some() {
                         return Err(format!(
                             "Line {curr_line_num}: when using ∨Elim, \
                             you cannot reference subproofs which \
                             introduce a boxed constant."
                         ));
+                    }
+                    let Some(s_begin_wff) = s_begin.sentence() else {
+                        return Err(format!(
+                            "Line {curr_line_num}: when using ∨Elim, the referenced subproofs \
+                            must start with a sentence."
+                        ));
                     };
-                    if disj != s_begin_wff {
+                    let Some(s_end_wff) = s_end.sentence() else {
+                        return Err(format!(
+                            "Line {curr_line_num}: when using ∨Elim, the referenced subproofs \
+                            must end with a sentence."
+                        ));
+                    };
+                    if disj.value() != s_begin_wff {
                         return Err(format!(
                             "Line {curr_line_num}: ∨Elim: {n}, ..... \
                             is used, but the premise of one of the \
@@ -892,22 +934,21 @@ impl Proof {
                     ));
                 };
                 let (s_begin, s_end) = self.get_subproof_at_lines(curr_line_num, (*n, *m))?;
-                if let (Some(s_begin_wff), Some(s_end_wff), None) =
-                    (&s_begin.sentence, &s_end.sentence, &s_begin.boxed_constant)
+                if let (Some(s_begin_wff), Some(s_end_wff), None) = (s_begin.sentence(), s_end.sentence(), s_begin.boxed_constant())
                 {
-                    if **a != *s_begin_wff && **b == *s_end_wff {
+                    if a.value() != s_begin_wff && b.value() == s_end_wff {
                         Err(format!(
                             "Line {curr_line_num}: →Intro is used, but \
                                 the premise of the referenced subproof does not match the \
                                 antecedent of the implication found in line {curr_line_num}."
                         ))
-                    } else if **a == *s_begin_wff && **b != *s_end_wff {
+                    } else if a.value() == s_begin_wff && b.value() != s_end_wff {
                         Err(format!(
                             "Line {curr_line_num}: →Intro is used, but \
                                 the last sentence of the referenced subproof does not match the \
                                 consequent of the implication found in line {curr_line_num}."
                         ))
-                    } else if **a != *s_begin_wff && **b != *s_end_wff {
+                    } else if a.value() != s_begin_wff && b.value() != s_end_wff {
                         Err(format!(
                             "Line {curr_line_num}: →Intro is used, but \
                                 the premise and last sentence of the referenced subproof \
@@ -927,7 +968,7 @@ impl Proof {
             Justification::ImpliesElim(n, m) => {
                 if let Wff::Implies(wff1, wff2) = self.get_wff_at_line(curr_line_num, *n)? {
                     let wff_m = self.get_wff_at_line(curr_line_num, *m)?;
-                    if *wff_m == **wff1 && **wff2 == *curr_wff {
+                    if wff_m == wff1.value() && wff2.value() == curr_wff {
                         Ok(())
                     } else {
                         Err(format!(
@@ -949,25 +990,25 @@ impl Proof {
                         self.get_subproof_at_lines(curr_line_num, (*sb1, *se1))?;
                     let (s_begin2, s_end2) =
                         self.get_subproof_at_lines(curr_line_num, (*sb2, *se2))?;
+                    // Check that the referenced subproofs actually have sentences and not boxed constants
                     if let (
                         Some(s_begin_wff1),
                         Some(s_end_wff1),
                         Some(s_begin_wff2),
                         Some(s_end_wff2),
-                        None,
-                        None,
+                        false
                     ) = (
-                        &s_begin1.sentence,
-                        &s_end1.sentence,
-                        &s_begin2.sentence,
-                        &s_end2.sentence,
-                        &s_begin1.boxed_constant,
-                        &s_begin2.boxed_constant,
+                        s_begin1.sentence(),
+                        s_end1.sentence(),
+                        s_begin2.sentence(),
+                        s_end2.sentence(),
+                        s_begin1.boxed_constant().is_some()
+                            || s_begin2.boxed_constant().is_some()
                     ) {
-                        if **p == *s_begin_wff1
-                            && **q == *s_end_wff1
-                            && **p == *s_end_wff2
-                            && **q == *s_begin_wff2
+                        if p.value() == s_begin_wff1
+                            && q.value() == s_end_wff1
+                            && p.value() == s_end_wff2
+                            && q.value() == s_begin_wff2
                         {
                             Ok(())
                         } else {
@@ -983,8 +1024,10 @@ impl Proof {
             Justification::BicondElim(n, m) => {
                 if let Wff::Bicond(wff1, wff2) = self.get_wff_at_line(curr_line_num, *n)? {
                     let wff_m = self.get_wff_at_line(curr_line_num, *m)?;
-                    if (*wff_m == **wff1 && **wff2 == *curr_wff)
-                        || (*wff_m == **wff2 && **wff1 == *curr_wff)
+                    let left_wff = wff1.value();
+                    let right_wff = wff2.value();
+                    if (wff_m == left_wff && right_wff == curr_wff) // eliminating using the LHS, getting the RHS
+                        || (wff_m == right_wff && left_wff == curr_wff) // the opposite
                     {
                         Ok(())
                     } else {
@@ -998,9 +1041,9 @@ impl Proof {
                 let (s_begin, s_end) = self.get_subproof_at_lines(curr_line_num, (*n, *m))?;
                 if let Wff::Not(negated) = curr_wff {
                     if let (Some(s_begin_wff), Some(s_end_wff)) =
-                        (&s_begin.sentence, &s_end.sentence)
+                        (s_begin.sentence(), s_end.sentence())
                     {
-                        if **negated == *s_begin_wff {
+                        if negated.value() == s_begin_wff {
                             if *s_end_wff == Wff::Bottom {
                                 Ok(())
                             } else {
@@ -1035,15 +1078,15 @@ impl Proof {
             }
             Justification::NotElim(n) => {
                 if let Wff::Not(negd_wff) = self.get_wff_at_line(curr_line_num, *n)? {
-                    if let Wff::Not(negd_negd_wff) = &**negd_wff {
-                        if **negd_negd_wff == *curr_wff {
+                    if let Wff::Not(negd_negd_wff) = negd_wff.value() {
+                        if negd_negd_wff.value() == curr_wff {
                             return Ok(());
                         }
                     }
                 }
                 if let Wff::Not(negd_wff) = curr_wff {
-                    if let Wff::Not(negd_negd_wff) = &**negd_wff {
-                        if *self.get_wff_at_line(curr_line_num, *n)? == **negd_negd_wff {
+                    if let Wff::Not(negd_negd_wff) = negd_wff.value() {
+                        if self.get_wff_at_line(curr_line_num, *n)? == negd_negd_wff.value() {
                             return Err(format!("Line {curr_line_num}: ¬Elim can only be used to go from ¬¬P to P, not the other way around"));
                         }
                     }
@@ -1054,7 +1097,7 @@ impl Proof {
                 let wff1 = self.get_wff_at_line(curr_line_num, *n)?;
                 let wff2 = self.get_wff_at_line(curr_line_num, *m)?;
                 if let Wff::Not(negd_wff) = wff2 {
-                    if *wff1 == **negd_wff {
+                    if wff1 == negd_wff.value() {
                         return Ok(());
                     }
                 }
@@ -1115,22 +1158,29 @@ impl Proof {
                     ));
                 };
                 let (s_begin, s_end) = self.get_subproof_at_lines(curr_line_num, (*sb, *se))?;
-                let Some(boxed_const @ Term::Atomic(bc)) = &s_begin.boxed_constant else {
+                let Some(boxed_const @ Term::Atomic(bc)) = s_begin.boxed_constant() else {
                     return Err(format!(
                         "Line {curr_line_num}: the rule ∀Intro is used, but the \
                         referenced subproof does not introduce a boxed constant"
                     ));
                 };
-                if s_begin.sentence.is_some() {
+                if s_begin.sentence().is_some() {
                     return Err(format!(
                             "Line {curr_line_num}: when using ∀Intro, the premise of the referenced subproof \
                             should consist of solely a boxed constant, without a sentence"
                     ));
                 }
+
+                let Some(sent_end) = s_end.sentence() else {
+                    // this shouldn't happen anyway...
+                    return Err(format!("Line {curr_line_num}: the rule ∀Elim:{sb}-{se} is used, but line {se} does not contain a sentence"));
+                };
+
+
                 if apply_trivial_substitution_everywhere_to_wff(
                     forall_curr_wff,
                     (&Term::Atomic(var.to_string()), boxed_const),
-                ) != *s_end.sentence.as_ref().unwrap()
+                ) != *sent_end
                 {
                     return Err(format!("Line {curr_line_num}: the rule ∀Intro:{sb}-{se} is used, but if all occurrences of {var} in the quantified part of line {curr_line_num} are replaced by {bc}, one does not obtain the sentence in line {se}"));
                 }
@@ -1138,17 +1188,19 @@ impl Proof {
                 Ok(())
             }
             Justification::ForallElim(n) => {
-                let Wff::Forall(var, ref_wff) = self.get_wff_at_line(curr_line_num, *n)? else {
+                let Wff::Forall(var, forall_ref_wff_box) = self.get_wff_at_line(curr_line_num, *n)? else {
                     return Err(format!(
                         "Line {curr_line_num}: the justification \
                         ∀Elim:{n} is used, but the sentence at line {n} is not a \
                         universally quantified sentence at the top level"
                     ));
                 };
+                let forall_ref_wff = (*forall_ref_wff_box).value();
                 if let Some((term1, term2)) =
-                    find_possible_trivial_substitution_wff(ref_wff, curr_wff)
+                    find_possible_trivial_substitution_wff(forall_ref_wff, curr_wff)
                 {
-                    if apply_trivial_substitution_everywhere_to_wff(ref_wff, (&term1, &term2))
+                    // if `find_possible_triviabl_substitution_wff` returns something we always need to double check
+                    if apply_trivial_substitution_everywhere_to_wff(forall_ref_wff, (&term1, &term2))
                         == *curr_wff
                         && Term::Atomic(var.to_string()) == term1
                     {
@@ -1166,7 +1218,7 @@ impl Proof {
                         };
                     }
                 }
-                if &**ref_wff == curr_wff {
+                if forall_ref_wff == curr_wff {
                     return Ok(());
                 }
                 Err(format!(
@@ -1175,13 +1227,14 @@ impl Proof {
                 ))
             }
             Justification::ExistsIntro(n) => {
-                let Wff::Exists(var, exists_curr_wff) = curr_wff else {
+                let Wff::Exists(var, exists_curr_wff_box) = curr_wff else {
                     return Err(format!(
                         "Line {curr_line_num}: the justification \
                         ∃Intro:{n} is used, but the sentence at line {curr_line_num} is not an \
                         existentially quantified sentence at the top level"
                     ));
                 };
+                let exists_curr_wff = (*exists_curr_wff_box).value();
                 let ref_wff = self.get_wff_at_line(curr_line_num, *n)?;
                 if let Some((term1, term2)) =
                     find_possible_trivial_substitution_wff(exists_curr_wff, ref_wff)
@@ -1204,7 +1257,7 @@ impl Proof {
                         };
                     }
                 }
-                if **exists_curr_wff == *ref_wff {
+                if exists_curr_wff == ref_wff {
                     return Ok(());
                 }
                 Err(format!(
@@ -1214,8 +1267,7 @@ impl Proof {
             }
             Justification::ExistsElim(n, (sb, se)) => {
                 let ref_wff = self.get_wff_at_line(curr_line_num, *n)?;
-                let (s_begin, s_end) = self.get_subproof_at_lines(curr_line_num, (*sb, *se))?;
-                let Wff::Exists(var, exists_ref_wff) = ref_wff else {
+                let Wff::Exists(var, exists_ref_wff_box) = ref_wff else {
                     return Err(format!(
                         "Line {curr_line_num}: the rule ∃Elim:{n},{sb}-{se} \
                     is used, but the sentence at line {n} ({}) is not an existentially \
@@ -1223,27 +1275,35 @@ impl Proof {
                         formatter::format_wff(ref_wff)
                     ));
                 };
+                let exists_ref_wff = (*exists_ref_wff_box).value();
+                let (s_begin, s_end) = self.get_subproof_at_lines(curr_line_num, (*sb, *se))?;
 
-                let Some(bc_term @ Term::Atomic(bc)) = &s_begin.boxed_constant else {
+                let Some(bc_term @ Term::Atomic(bc)) = s_begin.boxed_constant() else {
                     return Err(format!("Line {curr_line_num}: the rule ∃Elim:{n},{sb}-{se} is used, but the referenced subproof does not introduce a boxed constant in line {sb}."));
                 };
 
-                if s_begin.sentence.is_none() {
+                let Some(sent_begin) = s_begin.sentence() else {
                     return Err(format!("Line {curr_line_num}: the rule ∃Elim:{n},{sb}-{se} is used, but line {sb} contains only a boxed constant; when using ∃Elim, it should contain both a boxed constant and a sentence"));
-                }
+                };
+
+                let Some(sent_end) = s_end.sentence() else {
+                    // this shouldn't happen anyway...
+                    return Err(format!("Line {curr_line_num}: the rule ∃Elim:{n},{sb}-{se} is used, but line {se} does not contain a sentence"));
+                };
+
                 if apply_trivial_substitution_everywhere_to_wff(
                     exists_ref_wff,
                     (&Term::Atomic(var.to_string()), bc_term),
-                ) == *s_begin.sentence.as_ref().unwrap()
+                   ) == *sent_begin
                 {
-                    if s_end.sentence.as_ref().unwrap() == curr_wff {
+                    if sent_end == curr_wff {
                         Ok(())
                     } else {
                         Err(format!(
                             "Line {curr_line_num}: the rule ∃Elim:{n},{sb}-{se} \
                         is used, but the sentence in line {se} ({}) is not the same as \
                         the sentence in line {curr_line_num} ({})",
-                            formatter::format_wff(s_end.sentence.as_ref().unwrap()),
+                            formatter::format_wff(sent_end),
                             formatter::format_wff(curr_wff),
                         ))
                     }
@@ -1259,7 +1319,7 @@ impl Proof {
                             exists_ref_wff,
                             (&Term::Atomic(var.to_string()), bc_term)
                         )),
-                        formatter::format_wff(s_begin.sentence.as_ref().unwrap())
+                        formatter::format_wff(sent_begin)
                     ))
                 }
             }
@@ -1373,7 +1433,12 @@ fn apply_trivial_substitution_everywhere_to_wff(wff: &Wff, subst: (&Term, &Term)
             Term::FuncApp(f, args) => Term::FuncApp(
                 f.to_string(),
                 args.iter()
-                    .map(|arg| apply_trivial_substitution_everywhere_to_term(arg, subst))
+                    .map(|arg| {
+                        dummy_lterm(apply_trivial_substitution_everywhere_to_term(
+                            arg.value(),
+                            subst,
+                        ))
+                    })
                     .collect(),
             ),
             Term::Atomic(_) if term == subst.0 => subst.1.clone(),
@@ -1382,9 +1447,9 @@ fn apply_trivial_substitution_everywhere_to_wff(wff: &Wff, subst: (&Term, &Term)
     }
 
     let mut new_wff = wff.clone();
-    terms_from_wff_mut(&mut new_wff)
-        .iter_mut()
-        .for_each(|term| **term = apply_trivial_substitution_everywhere_to_term(term, subst));
+    for term in terms_from_wff_mut(&mut new_wff) {
+        *term = apply_trivial_substitution_everywhere_to_term(term, subst);
+    }
     new_wff
 }
 
@@ -1462,38 +1527,64 @@ fn wffs_are_syntactically_equal_except_possibly_the_terms(wff1: &Wff, wff2: &Wff
     }
 }
 
-// This is a macro to duplicate the same code for both mutable and immutable references...
-// It's really cursed, but I saw no better way, other than having duplicate code, since Rust doesn't
-// have an inbuilt way of parametrizing over mutability (yet?).
-macro_rules! terms_from_wff_macro {
-    ($func_name:ident, $($mut_:tt)?) => {
-        /// Generates a vector of (((mutable))) references to the [Term]s that are present in a certain [Wff], in a
-        /// deterministic order. For recursive terms, such as f(f(f(x))), only the topmost [Term] is
-        /// included in the output vector (but this [Term] still recursively contains the sub[Term]s).
-        fn $func_name(wff: & $($mut_)? Wff) -> Vec<& $($mut_)? Term> {
-            fn helper<'a>(wff: &'a $($mut_)? Wff, ts: &mut Vec<&'a $($mut_)? Term>) {
-                match wff {
-                    Wff::Equals(t1, t2) => ts.extend([t1, t2]),
-                    Wff::And(li) | Wff::Or(li) => {
-                        for w in li {
-                            helper(w, ts);
-                        }
-                    }
-                    Wff::Implies(t1, t2) | Wff::Bicond(t1, t2) => {
-                        helper(t1, ts);
-                        helper(t2, ts);
-                    }
-                    Wff::PredApp(_, args) => ts.extend(args),
-                    Wff::Forall(_, w) | Wff::Exists(_, w) => helper(w, ts),
-                    Wff::Not(w) => helper(w, ts),
-                    Wff::Bottom | Wff::Atomic(_) => {}
+fn terms_from_wff(wff: &Wff) -> Vec<&Term> {
+    fn helper<'a>(wff: &'a Wff, ts: &mut Vec<&'a Term>) {
+        match wff {
+            Wff::Equals(t1, t2) => {
+                ts.push(t1.value());
+                ts.push(t2.value());
+            }
+            Wff::And(li) | Wff::Or(li) => {
+                for w in li {
+                    helper(w.value(), ts);
                 }
             }
-            let mut terms: Vec<& $($mut_)? Term> = vec![];
-            helper(wff, &mut terms);
-            terms
+            Wff::Implies(t1, t2) | Wff::Bicond(t1, t2) => {
+                helper(t1.value(), ts);
+                helper(t2.value(), ts);
+            }
+            Wff::PredApp(_, args) => {
+                for arg in args {
+                    ts.push(arg.value());
+                }
+            }
+            Wff::Forall(_, w) | Wff::Exists(_, w) => helper(w.value(), ts),
+            Wff::Not(w) => helper(w.value(), ts),
+            Wff::Bottom | Wff::Atomic(_) => {}
         }
     }
+    let mut terms: Vec<&Term> = vec![];
+    helper(wff, &mut terms);
+    terms
 }
-terms_from_wff_macro!(terms_from_wff,);
-terms_from_wff_macro!(terms_from_wff_mut, mut);
+
+fn terms_from_wff_mut(wff: &mut Wff) -> Vec<&mut Term> {
+    fn helper<'a>(wff: &'a mut Wff, ts: &mut Vec<&'a mut Term>) {
+        match wff {
+            Wff::Equals(t1, t2) => {
+                ts.push(t1.value_mut());
+                ts.push(t2.value_mut());
+            }
+            Wff::And(li) | Wff::Or(li) => {
+                for w in li {
+                    helper(w.value_mut(), ts);
+                }
+            }
+            Wff::Implies(t1, t2) | Wff::Bicond(t1, t2) => {
+                helper(t1.value_mut(), ts);
+                helper(t2.value_mut(), ts);
+            }
+            Wff::PredApp(_, args) => {
+                for arg in args {
+                    ts.push(arg.value_mut());
+                }
+            }
+            Wff::Forall(_, w) | Wff::Exists(_, w) => helper(w.value_mut(), ts),
+            Wff::Not(w) => helper(w.value_mut(), ts),
+            Wff::Bottom | Wff::Atomic(_) => {}
+        }
+    }
+    let mut terms: Vec<&mut Term> = vec![];
+    helper(wff, &mut terms);
+    terms
+}

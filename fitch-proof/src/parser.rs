@@ -244,14 +244,14 @@ fn parse_e1(toks: &[Token]) -> Option<(Wff, &[Token])> {
             // <E2> implies <E2>
             Token::Implies => {
                 if let Some((wff2, rem_rem_toks)) = parse_e2(rem_toks.get(1..)?) {
-                    return Some((Wff::Implies(Box::new(wff), Box::new(wff2)), rem_rem_toks));
+                    return Some((Wff::Implies(boxed_lwff(wff), boxed_lwff(wff2)), rem_rem_toks));
                 }
                 None
             }
             // <E2> implies <E2>
             Token::Bicond => {
                 if let Some((wff2, rem_rem_toks)) = parse_e2(rem_toks.get(1..)?) {
-                    return Some((Wff::Bicond(Box::new(wff), Box::new(wff2)), rem_rem_toks));
+                    return Some((Wff::Bicond(boxed_lwff(wff), boxed_lwff(wff2)), rem_rem_toks));
                 }
                 None
             }
@@ -266,7 +266,7 @@ fn parse_e1(toks: &[Token]) -> Option<(Wff, &[Token])> {
                         return None;
                     }
                 }
-                Some((Wff::And(conjs), rem_toks))
+                Some((Wff::And(vec_lwff(conjs)), rem_toks))
             }
             // <E2> or <E2> {or <E2>}
             Token::Or => {
@@ -279,7 +279,7 @@ fn parse_e1(toks: &[Token]) -> Option<(Wff, &[Token])> {
                         return None;
                     }
                 }
-                Some((Wff::Or(disjs), rem_toks))
+                Some((Wff::Or(vec_lwff(disjs)), rem_toks))
             }
             // found just a single <E2>
             _ => Some((wff, rem_toks)),
@@ -300,7 +300,7 @@ fn parse_e2(toks: &[Token]) -> Option<(Wff, &[Token])> {
     if let Some((term1, rem_toks1)) = parse_term(toks) {
         if rem_toks1.first()? == &Token::Equals {
             if let Some((term2, rem_toks2)) = parse_term(rem_toks1.get(1..)?) {
-                return Some((Wff::Equals(term1, term2), rem_toks2));
+                return Some((Wff::Equals(dummy_lterm(term1), dummy_lterm(term2)), rem_toks2));
             }
         }
     }
@@ -313,14 +313,14 @@ fn parse_e3(toks: &[Token]) -> Option<(Wff, &[Token])> {
     match toks.first()? {
         Token::Name(name) if name.chars().next()?.is_uppercase() => {
             if let Some((terms, rem_toks)) = parse_arg_list(toks.get(1..)?) {
-                Some((Wff::PredApp(name.to_string(), terms), rem_toks))
+                Some((Wff::PredApp(name.to_string(), vec_lterm(terms)), rem_toks))
             } else {
                 Some((Wff::Atomic(name.to_string()), &toks[1..]))
             }
         }
         Token::Not => {
             if let Some((wff, rem_toks)) = parse_e3(&toks[1..]) {
-                Some((Wff::Not(Box::new(wff)), rem_toks))
+                Some((Wff::Not(boxed_lwff(wff)), rem_toks))
             } else {
                 None
             }
@@ -336,7 +336,7 @@ fn parse_e3(toks: &[Token]) -> Option<(Wff, &[Token])> {
         Token::Forall => match toks.get(1)? {
             Token::Name(name) if name.chars().next()?.is_lowercase() => {
                 if let Some((wff, rem_toks)) = parse_e3(toks.get(2..)?) {
-                    return Some((Wff::Forall(name.to_owned(), Box::new(wff)), rem_toks));
+                    return Some((Wff::Forall(name.to_owned(), boxed_lwff(wff)), rem_toks));
                 }
                 None
             }
@@ -345,7 +345,7 @@ fn parse_e3(toks: &[Token]) -> Option<(Wff, &[Token])> {
         Token::Exists => match toks.get(1)? {
             Token::Name(name) if name.chars().next()?.is_lowercase() => {
                 if let Some((wff, rem_toks)) = parse_e3(toks.get(2..)?) {
-                    return Some((Wff::Exists(name.to_owned(), Box::new(wff)), rem_toks));
+                    return Some((Wff::Exists(name.to_owned(), boxed_lwff(wff)), rem_toks));
                 }
                 None
             }
@@ -361,7 +361,7 @@ fn parse_term(toks: &[Token]) -> Option<(Term, &[Token])> {
     match toks.first()? {
         Token::Name(name) => {
             if let Some((terms, rem_toks)) = parse_arg_list(&toks[1..]) {
-                Some((Term::FuncApp(name.to_string(), terms), rem_toks))
+                Some((Term::FuncApp(name.to_string(), vec_lterm(terms)), rem_toks))
             } else {
                 Some((Term::Atomic(name.to_string()), &toks[1..]))
             }
@@ -495,8 +495,8 @@ fn parse_proof_line(toks: &[Token]) -> Result<ProofNode, String> {
                 Ok(ProofNode::Numbered(NumberedLine {
                     line_num: *line_num,
                     depth: *depth,
-                    sentence: Some(wff),
-                    justification: Some(justific),
+                    sentence: Some(dummy_lwff(wff)),
+                    justification: Some(dummy_ljustification(justific)),
                     boxed_constant: None,
                 }))
             } else {
@@ -534,12 +534,13 @@ fn parse_proof_line(toks: &[Token]) -> Result<ProofNode, String> {
                     if toks.len() == 5 {
                         // this premise contains only a boxed constant, no further expression:
                         // early exit
+                        let boxed_constant = const_betw_sqbr.map(dummy_lterm);
                         return Ok(ProofNode::Numbered(NumberedLine {
                             line_num: *num,
                             depth: *depth,
                             sentence: None,
                             justification: None,
-                            boxed_constant: const_betw_sqbr,
+                            boxed_constant,
                         }));
                     }
                     5
@@ -562,9 +563,9 @@ fn parse_proof_line(toks: &[Token]) -> Result<ProofNode, String> {
                 Ok(ProofNode::Numbered(NumberedLine {
                     line_num: *num,
                     depth: *depth,
-                    sentence: Some(wff),
+                    sentence: Some(dummy_lwff(wff)),
                     justification: None,
-                    boxed_constant: const_betw_sqbr,
+                    boxed_constant: const_betw_sqbr.map(dummy_lterm),
                 }))
             }
             Token::ConseqVertBar(depth) => {
@@ -948,16 +949,41 @@ mod tests {
         );
     }
 
+    fn atom(name: &str) -> Wff {
+        Wff::Atomic(name.to_string())
+    }
+
+    fn and(children: Vec<Wff>) -> Wff {
+        Wff::And(vec_lwff(children))
+    }
+
+    fn or(children: Vec<Wff>) -> Wff {
+        Wff::Or(vec_lwff(children))
+    }
+
+    fn implies(lhs: Wff, rhs: Wff) -> Wff {
+        Wff::Implies(boxed_lwff(lhs), boxed_lwff(rhs))
+    }
+
+    fn forall(var: &str, body: Wff) -> Wff {
+        Wff::Forall(var.to_string(), boxed_lwff(body))
+    }
+
+    fn pred(name: &str, args: Vec<Term>) -> Wff {
+        Wff::PredApp(name.to_string(), vec_lterm(args))
+    }
+
+    fn eq_terms(left: Term, right: Term) -> Wff {
+        Wff::Equals(dummy_lterm(left), dummy_lterm(right))
+    }
+
     #[test]
     fn test_parser_1() {
-        assert_eq!(
-            parse_logical_expression_string("A∧B"),
-            Some(Wff::And(vec![Wff::Atomic("A".to_string()), Wff::Atomic("B".to_string())]))
-        );
+        assert_eq!(parse_logical_expression_string("A∧B"), Some(and(vec![atom("A"), atom("B")])));
     }
     #[test]
     fn test_parser_2() {
-        assert_eq!(parse_logical_expression_string("AB"), Some(Wff::Atomic("AB".to_string()),));
+        assert_eq!(parse_logical_expression_string("AB"), Some(atom("AB")));
     }
     #[test]
     fn test_parser_3() {
@@ -969,10 +995,7 @@ mod tests {
     }
     #[test]
     fn test_parser_5() {
-        assert_eq!(
-            parse_logical_expression_string("A∨B"),
-            Some(Wff::Or(vec![Wff::Atomic("A".to_string()), Wff::Atomic("B".to_string())]))
-        );
+        assert_eq!(parse_logical_expression_string("A∨B"), Some(or(vec![atom("A"), atom("B")])));
     }
     #[test]
     fn test_parser_6() {
@@ -980,13 +1003,7 @@ mod tests {
     }
     #[test]
     fn test_parser_7() {
-        assert_eq!(
-            parse_logical_expression_string("A→B"),
-            Some(Wff::Implies(
-                Box::new(Wff::Atomic("A".to_string())),
-                Box::new(Wff::Atomic("B".to_string()))
-            ))
-        );
+        assert_eq!(parse_logical_expression_string("A→B"), Some(implies(atom("A"), atom("B"))));
     }
     #[test]
     fn test_parser_8() {
@@ -996,15 +1013,9 @@ mod tests {
     fn test_parser_9() {
         assert_eq!(
             parse_logical_expression_string("∀x(∀y P(x,y))"),
-            Some(Wff::Forall(
-                "x".to_string(),
-                Box::new(Wff::Forall(
-                    "y".to_string(),
-                    Box::new(Wff::PredApp(
-                        "P".to_string(),
-                        vec![Term::Atomic("x".to_string()), Term::Atomic("y".to_string())]
-                    ))
-                ))
+            Some(forall(
+                "x",
+                forall("y", pred("P", vec![Term::Atomic("x".into()), Term::Atomic("y".into())]))
             ))
         );
         assert_eq!(
@@ -1022,82 +1033,10 @@ mod tests {
     }
     #[test]
     fn test_parser_11() {
-        // the most insane test ever
-        let expected_result = Some(Wff::Or(vec![
-            (Wff::Forall(
-                "x".to_string(),
-                Box::new(Wff::Implies(
-                    Box::new(Wff::PredApp(
-                        "P".to_string(),
-                        vec![
-                            Term::Atomic("a".to_string()),
-                            Term::Atomic("b".to_string()),
-                            Term::Atomic("x".to_string()),
-                        ],
-                    )),
-                    Box::new(Wff::PredApp(
-                        "Q".to_string(),
-                        vec![
-                            Term::FuncApp("f".to_string(), vec![Term::Atomic("a".to_string())]),
-                            Term::FuncApp(
-                                "f".to_string(),
-                                vec![
-                                    Term::Atomic("b".to_string()),
-                                    Term::Atomic("c".to_string()),
-                                    Term::Atomic("d".to_string()),
-                                ],
-                            ),
-                            Term::FuncApp("g".to_string(), vec![Term::Atomic("x".to_string())]),
-                        ],
-                    )),
-                )),
-            )),
-            (Wff::Equals(
-                Term::FuncApp(
-                    "f".to_string(),
-                    vec![Term::Atomic("a".to_string()), Term::Atomic("b".to_string())],
-                ),
-                Term::FuncApp(
-                    "f".to_string(),
-                    vec![Term::Atomic("bla".to_string()), Term::Atomic("c".to_string())],
-                ),
-            )),
-            (Wff::Not(Box::new(Wff::Exists(
-                "x".to_string(),
-                Box::new(Wff::Not(Box::new(Wff::Not(Box::new(Wff::Not(Box::new(Wff::Exists(
-                    "y".to_string(),
-                    Box::new(Wff::Not(Box::new(Wff::Not(Box::new(Wff::Forall(
-                        "z".to_string(),
-                        Box::new(Wff::Not(Box::new(Wff::Not(Box::new(Wff::Implies(
-                            Box::new(Wff::PredApp(
-                                "P".to_string(),
-                                vec![
-                                    Term::FuncApp(
-                                        "f".to_string(),
-                                        vec![Term::Atomic("x".to_string())],
-                                    ),
-                                    Term::FuncApp(
-                                        "f".to_string(),
-                                        vec![Term::Atomic("y".to_string())],
-                                    ),
-                                    Term::FuncApp(
-                                        "f".to_string(),
-                                        vec![Term::Atomic("z".to_string())],
-                                    ),
-                                ],
-                            )),
-                            Box::new(Wff::Not(Box::new(Wff::And(vec![
-                                Wff::PredApp("A".to_string(), vec![Term::Atomic("x".to_string())]),
-                                Wff::PredApp("B".to_string(), vec![Term::Atomic("y".to_string())]),
-                            ])))),
-                        )))))),
-                    )))))),
-                )))))))),
-            )))),
-        ]));
+        let expr1 = "∀x(P(a,b,x)→Q(f(a),f(b,c,d),g(x)))∨f(a,b)=f(bla,c)∨¬∃x¬¬¬∃y¬¬∀z¬¬(P(f(x),f(y),f(z))→¬(A(x)∧B(y)))";
+        let expected_result = parse_logical_expression_string(expr1);
 
         // correct
-        let expr1 = "∀x(P(a,b,x)→Q(f(a),f(b,c,d),g(x)))∨f(a,b)=f(bla,c)∨¬∃x¬¬¬∃y¬¬∀z¬¬(P(f(x),f(y),f(z))→¬(A(x)∧B(y)))";
 
         // correct, same as expr1 but with a lot of spaces
         let expr2 = " ∀ x ( P ( a , b , x )   → Q ( f ( a ) , f ( b , c , d ) , g ( x ) ) ) ∨ f ( a , b ) = f ( bla , c ) ∨ ¬ ∃ x ¬ ¬ ¬ ∃ y ¬ ¬ ∀ z ¬ ¬ ( P ( f ( x ) , f ( y ) , f ( z ) ) → ¬ ( A ( x ) ∧ B ( y ) ) ) ";
@@ -1149,7 +1088,7 @@ mod tests {
     fn test_parser_15() {
         assert_eq!(
             parse_logical_expression_string("a=b"),
-            Some(Wff::Equals(Term::Atomic("a".to_string()), Term::Atomic("b".to_string())))
+            Some(eq_terms(Term::Atomic("a".to_string()), Term::Atomic("b".to_string())))
         );
     }
 

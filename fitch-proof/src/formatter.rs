@@ -5,13 +5,13 @@ use crate::data::*;
 /// Formats a proof.
 ///
 /// PRECONDITION (panics otherwise): !proof_nodes.is_empty()
-pub fn format_proof(proof_nodes: Vec<ProofNode>) -> String {
-    let text_nodes: Vec<ProofNode> =
+pub fn format_proof(proof_nodes: Vec<LProofNode>) -> String {
+    let text_nodes: Vec<LProofNode> =
         proof_nodes.into_iter().filter(|node| !node.is_structural()).collect();
 
     let mut line_strings: Vec<String> = text_nodes
         .iter()
-        .map(|node| match node {
+        .map(|node| match node.value() {
             ProofNode::Numbered(line) => line.line_num.to_string(),
             _ => "".to_string(),
         })
@@ -25,16 +25,16 @@ pub fn format_proof(proof_nodes: Vec<ProofNode>) -> String {
     }
 
     for (node, line_string) in zip(&text_nodes, &mut line_strings) {
-        if matches!(node, ProofNode::FitchBar { .. }) {
+        if matches!(node.value(), ProofNode::FitchBar { .. }) {
             line_string.push_str("----");
         }
     }
 
     for (node, line_string) in zip(&text_nodes, &mut line_strings) {
-        if let ProofNode::Numbered(line) = node {
-            if let Some(term) = &line.boxed_constant {
+        if let ProofNode::Numbered(line) = node.value() {
+            if let Some(term) = line.boxed_constant_with_loc() {
                 line_string.push_str(" [");
-                line_string.push_str(match term {
+                line_string.push_str(match term.value() {
                     Term::Atomic(str) => str,
                     _ => panic!(),
                 });
@@ -44,7 +44,7 @@ pub fn format_proof(proof_nodes: Vec<ProofNode>) -> String {
     }
 
     for (node, line_string) in zip(&text_nodes, &mut line_strings) {
-        if let ProofNode::Numbered(line) = node {
+        if let ProofNode::Numbered(line) = node.value() {
             if let Some(sentence) = &line.sentence {
                 line_string.push(' ');
                 line_string.push_str(&format_wff(sentence));
@@ -55,7 +55,7 @@ pub fn format_proof(proof_nodes: Vec<ProofNode>) -> String {
     pad_to_same_length(&mut line_strings, 9);
 
     for (node, line_string) in zip(&text_nodes, &mut line_strings) {
-        if let ProofNode::Numbered(line) = node {
+        if let ProofNode::Numbered(line) = node.value() {
             if let Some(just) = &line.justification {
                 line_string.push_str(&format_justification(just));
             }
@@ -77,25 +77,37 @@ pub fn format_wff(wff: &Wff) -> String {
         match wff {
             Wff::Bottom => "⊥".to_owned(),
             Wff::Or(li) => {
-                format!("({})", li.iter().map(wff_with_brackets).collect::<Vec<_>>().join(" ∨ "))
+                format!(
+                    "({})",
+                    li.iter().map(|w| wff_with_brackets(w.value())).collect::<Vec<_>>().join(" ∨ ")
+                )
             }
             Wff::And(li) => {
-                format!("({})", li.iter().map(wff_with_brackets).collect::<Vec<_>>().join(" ∧ "))
+                format!(
+                    "({})",
+                    li.iter().map(|w| wff_with_brackets(w.value())).collect::<Vec<_>>().join(" ∧ ")
+                )
             }
-            Wff::Not(w) => format!("¬{}", wff_with_brackets(w)),
+            Wff::Not(w) => format!("¬{}", wff_with_brackets(w.value())),
             Wff::Implies(w1, w2) => {
-                format!("({} → {})", wff_with_brackets(w1), wff_with_brackets(w2))
+                format!("({} → {})", wff_with_brackets(w1.value()), wff_with_brackets(w2.value()))
             }
             Wff::Bicond(w1, w2) => {
-                format!("({} ↔ {})", wff_with_brackets(w1), wff_with_brackets(w2))
+                format!("({} ↔ {})", wff_with_brackets(w1.value()), wff_with_brackets(w2.value()))
             }
-            Wff::Forall(s, w) => format!("∀{} {}", s, wff_with_brackets(w)),
-            Wff::Exists(s, w) => format!("∃{} {}", s, wff_with_brackets(w)),
+            Wff::Forall(s, w) => format!("∀{} {}", s, wff_with_brackets(w.value())),
+            Wff::Exists(s, w) => format!("∃{} {}", s, wff_with_brackets(w.value())),
             Wff::PredApp(s, args) => {
-                format!("{}({})", s, args.iter().map(format_term).collect::<Vec<_>>().join(","))
+                format!(
+                    "{}({})",
+                    s,
+                    args.iter().map(|t| format_term(t.value())).collect::<Vec<_>>().join(",")
+                )
             }
             Wff::Atomic(p) => p.to_string(),
-            Wff::Equals(t1, t2) => format!("({}={})", format_term(t1), format_term(t2)),
+            Wff::Equals(t1, t2) => {
+                format!("({}={})", format_term(t1.value()), format_term(t2.value()))
+            }
         }
     }
     let wff_string = wff_with_brackets(wff);
@@ -119,7 +131,11 @@ pub fn format_term(term: &Term) -> String {
     match term {
         Term::Atomic(t) => t.to_owned(),
         Term::FuncApp(f, args) => {
-            format!("{}({})", f, args.iter().map(format_term).collect::<Vec<_>>().join(","))
+            format!(
+                "{}({})",
+                f,
+                args.iter().map(|t| format_term(t.value())).collect::<Vec<_>>().join(",")
+            )
         }
     }
 }

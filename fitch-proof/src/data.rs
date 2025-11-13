@@ -1,3 +1,39 @@
+use crate::loc::{Location, WithLoc};
+
+pub type LProofNode = WithLoc<ProofNode>;
+pub type LWff = WithLoc<Wff>;
+pub type LTerm = WithLoc<Term>;
+pub type LJustification = WithLoc<Justification>;
+
+// Temp code for plugging in type errors
+pub fn wrap_nodes_with_dummy_locations(nodes: Vec<ProofNode>) -> Vec<LProofNode> {
+    nodes.into_iter().map(WithLoc::dummy).collect()
+}
+
+pub fn dummy_lwff(wff: Wff) -> LWff {
+    WithLoc::dummy(wff)
+}
+
+pub fn dummy_lterm(term: Term) -> LTerm {
+    WithLoc::dummy(term)
+}
+
+pub fn dummy_ljustification(just: Justification) -> LJustification {
+    WithLoc::dummy(just)
+}
+
+pub fn boxed_lwff(wff: Wff) -> Box<LWff> {
+    Box::new(dummy_lwff(wff))
+}
+
+pub fn vec_lwff(wffs: Vec<Wff>) -> Vec<LWff> {
+    wffs.into_iter().map(dummy_lwff).collect()
+}
+
+pub fn vec_lterm(terms: Vec<Term>) -> Vec<LTerm> {
+    terms.into_iter().map(dummy_lterm).collect()
+}
+
 /// A `ProofNode` represents every relevant element of a Fitch-style proof in document order.
 ///
 /// Roughly, it correponds to either a physical line in a text-based
@@ -74,9 +110,9 @@ impl ProofNode {
 pub struct NumberedLine {
     pub line_num: usize,
     pub depth: usize,
-    pub sentence: Option<Wff>,
-    pub justification: Option<Justification>,
-    pub boxed_constant: Option<Term>,
+    pub sentence: Option<LWff>,
+    pub justification: Option<LJustification>,
+    pub boxed_constant: Option<LTerm>,
 }
 
 #[derive(PartialEq, Debug, Clone)]
@@ -87,27 +123,27 @@ pub struct NumberedLine {
 /// constant).
 pub enum Wff {
     /// Conjunction.
-    And(Vec<Wff>),
+    And(Vec<LWff>),
     /// Disjunction.
-    Or(Vec<Wff>),
+    Or(Vec<LWff>),
     /// Implication.
-    Implies(Box<Wff>, Box<Wff>),
+    Implies(Box<LWff>, Box<LWff>),
     /// Biconditional.
-    Bicond(Box<Wff>, Box<Wff>),
+    Bicond(Box<LWff>, Box<LWff>),
     /// Negation.
-    Not(Box<Wff>),
+    Not(Box<LWff>),
     /// Bottom / contradiction.
     Bottom,
     /// Universal quantification.
     ///
     /// The associated [String] denotes the name of the variable that is quantified over, and the
     /// associated [Wff] is the rest of the sentence.
-    Forall(String, Box<Wff>),
+    Forall(String, Box<LWff>),
     /// Existential quantification.
     ///
     /// The associated [String] denotes the name of the variable that is quantified over, and the
     /// associated [Wff] is the rest of the sentence.
-    Exists(String, Box<Wff>),
+    Exists(String, Box<LWff>),
     /// This is a nullary predicate, for example "P".
     Atomic(String),
     /// This is n-ary predicate application, for n >= 1.
@@ -115,9 +151,9 @@ pub enum Wff {
     /// For example, if you have the predicate application `P(x,y,f(a))`, then the associated [String]
     /// would be "P" and the associated vector of [Term]s would correspond to `x`, `y` and `f(a)`,
     /// respectively.
-    PredApp(String, Vec<Term>),
+    PredApp(String, Vec<LTerm>),
     /// The equality predicate, applied to two [Term]s.
-    Equals(Term, Term),
+    Equals(LTerm, LTerm),
 }
 
 /// This a logical term. A term can be either a constant, a variable, or a function application
@@ -127,9 +163,8 @@ pub enum Term {
     /// A variable or constant.
     Atomic(String),
     // Function application
-    FuncApp(String, Vec<Term>),
+    FuncApp(String, Vec<LTerm>),
 }
-
 
 /// This enum represents the justification rules for an inference. The associated [usize]s denote
 /// the line numbers being represented.
@@ -164,8 +199,55 @@ impl NumberedLine {
     pub fn is_inference(&self) -> bool {
         self.justification.is_some()
     }
-}
 
+    pub fn sentence(&self) -> Option<&Wff> {
+        self.sentence.as_ref().map(|w| w.value())
+    }
+
+    pub fn sentence_with_loc(&self) -> Option<&LWff> {
+        self.sentence.as_ref()
+    }
+
+    pub fn justification(&self) -> Option<&Justification> {
+        self.justification.as_ref().map(|j| j.value())
+    }
+
+    pub fn justification_with_loc(&self) -> Option<&LJustification> {
+        self.justification.as_ref()
+    }
+
+    pub fn boxed_constant(&self) -> Option<&Term> {
+        self.boxed_constant.as_ref().map(|t| t.value())
+    }
+
+    pub fn boxed_constant_with_loc(&self) -> Option<&LTerm> {
+        self.boxed_constant.as_ref()
+    }
+
+    pub fn sentence_loc(&self) -> Option<&Location> {
+        self.sentence.as_ref().map(|w| w.location())
+    }
+
+    pub fn justification_loc(&self) -> Option<&Location> {
+        self.justification.as_ref().map(|j| j.location())
+    }
+
+    pub fn boxed_constant_loc(&self) -> Option<&Location> {
+        self.boxed_constant.as_ref().map(|t| t.location())
+    }
+
+    pub fn sentence_owned(&self) -> Option<Wff> {
+        self.sentence().cloned()
+    }
+
+    pub fn justification_owned(&self) -> Option<Justification> {
+        self.justification().cloned()
+    }
+
+    pub fn boxed_constant_owned(&self) -> Option<Term> {
+        self.boxed_constant().cloned()
+    }
+}
 
 impl Justification {
     pub fn rule_used(self: &Justification) -> (&'static str, &'static str) {
