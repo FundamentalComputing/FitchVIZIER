@@ -7,7 +7,9 @@ mod formatter;
 mod parser;
 mod proof;
 mod util;
+pub use crate::data::{Justification, NumberedLine, ProofNode};
 use crate::data::{ProofResult, Wff};
+pub use parser::parse_fitch_proof;
 
 macro_rules! default_variable_names {
     () => {
@@ -69,7 +71,7 @@ fn check_proof_to_proofresult(proof: &str, allowed_variable_names: &str) -> Proo
         parser::parse_fitch_proof(proof),
         parser::parse_allowed_variable_names(allowed_variable_names),
     ) {
-        (Ok(proof_lines), Ok(variable_names)) => checker::check_proof(proof_lines, variable_names),
+        (Ok(proof_nodes), Ok(variable_names)) => checker::check_proof(proof_nodes, variable_names),
         (Err(err), _) | (_, Err(err)) => ProofResult::FatalError(err),
     }
 }
@@ -90,7 +92,7 @@ fn check_proof_to_proofresult_with_template(
         parser::parse_fitch_proof(proof),
         parser::parse_allowed_variable_names(allowed_variable_names),
     ) {
-        (Ok(proof_lines), Ok(variable_names)) => {
+        (Ok(proof_nodes), Ok(variable_names)) => {
             let template_wffs: Vec<Wff> = template
                 .iter()
                 .filter_map(|s| parser::parse_logical_expression_string(s))
@@ -98,7 +100,7 @@ fn check_proof_to_proofresult_with_template(
             if template_wffs.len() != template.len() {
                 return ProofResult::FatalError("Some sentences in the template file could not be parsed. If you see this as a student on Themis, please contact the course staff as soon as possible; something is wrong on our side. Thanks!".to_owned());
             }
-            checker::check_proof_with_template(proof_lines, template_wffs, variable_names)
+            checker::check_proof_with_template(proof_nodes, template_wffs, variable_names)
         }
         (Err(err), _) | (_, Err(err)) => ProofResult::FatalError(err),
     }
@@ -120,7 +122,7 @@ pub fn proof_is_correct(proof: &str) -> bool {
 #[wasm_bindgen]
 pub fn format_proof(proof: &str) -> String {
     match parser::parse_fitch_proof(proof) {
-        Ok(lines) if !lines.is_empty() => formatter::format_proof(lines),
+        Ok(nodes) if !nodes.is_empty() => formatter::format_proof(nodes),
         _ => proof.to_owned(),
     }
 }
@@ -134,9 +136,9 @@ pub fn format_proof(proof: &str) -> String {
 #[wasm_bindgen]
 pub fn fix_line_numbers_in_proof(proof: &str) -> String {
     match parser::parse_fitch_proof(proof) {
-        Ok(mut lines) if !lines.is_empty() => {
-            fix_line_numbers::fix_line_numbers(&mut lines);
-            formatter::format_proof(lines)
+        Ok(mut nodes) if !nodes.is_empty() => {
+            fix_line_numbers::fix_line_numbers(&mut nodes);
+            formatter::format_proof(nodes)
         }
         _ => proof.to_owned(),
     }
@@ -145,7 +147,7 @@ pub fn fix_line_numbers_in_proof(proof: &str) -> String {
 #[wasm_bindgen]
 pub fn export_to_latex(proof: &str) -> String {
     match parser::parse_fitch_proof(proof) {
-        Ok(lines) if !lines.is_empty() => export_to_latex::proof_to_latex(&lines),
+        Ok(nodes) if !nodes.is_empty() => export_to_latex::proof_to_latex(&nodes),
         _ => "Failed to export to latex, because the proof could not be parsed or was empty."
             .to_string(),
     }

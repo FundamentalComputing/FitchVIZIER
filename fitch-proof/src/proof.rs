@@ -26,168 +26,146 @@ pub type Scope = Vec<(Vec<usize>, Vec<(usize, usize)>)>;
 /// Note that a [Proof] does not necessarily mean "a fully correct proof". If you want to assess
 /// the full correctness of a [Proof], use [Proof::is_fully_correct].
 pub struct Proof {
-    ///  a vector containing all the [ProofLine]s this proof consists of,
-    pub lines: Vec<ProofLine>,
+    ///  the unified sequence of proof nodes that encode numbered lines and structural markers.
+    pub nodes: Vec<ProofNode>,
     ///  a field that contains the [Scope] of the proof (it contains information which lines may
     /// reference which lines)
     pub scope: Scope,
-    ///  a field containing the [ProofUnit]s: this is useful for assessing the validity of the
-    /// structure of the proof.
-    pub units: Vec<ProofUnit>,
     ///  a field which contains the set of strings that should be seen as a variable.
     pub allowed_variable_names: HashSet<String>,
 }
 
-/// An enum that is useful to look at the structure of a proof. This is useful for example when you
-/// want to figure out which lines can reference which other lines. A proof can be represented
-/// using a vector of [ProofUnit]s. One of the important differences between a vector [ProofLine]s
-/// and a vector of [ProofUnit]s is that in a vector of [ProofLine]s, for each proof line the depth
-/// is stored, and if you want to see where subproofs begin and end, you should look at the `depth`
-/// of the [ProofLine]s. However, the opening and closing of a subproof are made much more explicit
-/// when you have a vector of [ProofUnit]s. If you have some inference at depth 2, and then a
-/// premise at depth 3 (i.e., a new subproof is opened), then between the corresponding
-/// [ProofUnit]s for the two sentences, there will be a [ProofUnit::SubproofOpen].
-///
-/// Empty lines are not representable in terms of [ProofUnit]s (and this is also not necessary).
-#[derive(Debug, PartialEq)]
-pub enum ProofUnit {
-    NumberedProofLineWithJustification(usize), // usize is line number
-    NumberedProofLineWithoutJustificationWithoutBoxedConstant(usize), // usize is line number
-    NumberedProofLineThatIntroducesBoxedConstant(usize), // usize is line number
-    FitchBarLine,
-    SubproofOpen,
-    SubproofClose,
-}
-
 impl Proof {
-    /// Given a vector of [ProofLine]s, this method constructs the proof. In case this method fails,
+    fn normalize_nodes(raw_nodes: Vec<ProofNode>) -> Result<Vec<ProofNode>, String> {
+        let mut normalized: Vec<ProofNode> = Vec::with_capacity(raw_nodes.len() * 2);
+        let mut prev_depth = 1;
+        let mut last_line_num = 0;
+
+        for node in raw_nodes {
+            if matches!(node, ProofNode::SubproofOpen { .. } | ProofNode::SubproofClose { .. }) {
+                return Err("internal error: proof already contains structural markers".to_string());
+            }
+
+            let depth = node.depth();
+
+            if depth == prev_depth + 1 {
+                normalized.push(ProofNode::SubproofOpen {
+                    depth,
+                });
+            } else if depth + 1 == prev_depth {
+                normalized.push(ProofNode::SubproofClose {
+                    depth: prev_depth,
+                });
+            } else if depth != prev_depth {
+                return Err(format!("near line {}, there is an 'indentation/scope jump' that is too big. You cannot open or close two subproofs in the same line.", last_line_num + 1));
+            }
+
+            if let ProofNode::Numbered(ref numbered) = node {
+                last_line_num = numbered.line_num;
+            }
+
+            normalized.push(node);
+            prev_depth = depth;
+        }
+
+        Ok(normalized)
+    }
+
+    /// Given a vector of [ProofNode]s, this method constructs the proof. In case this method fails,
     /// it means a fatal error will need to be given, because if this method already fails then the
     /// proof is not even half-well-structured, and further analysis is impossible. After
     /// [Proof::construct]ing the proof, you should [Proof::is_fully_correct]() it. The combination of these two things
     /// allows you to assess the correctness of a proof.
     pub fn construct(
-        proof_lines: Vec<ProofLine>,
+        raw_nodes: Vec<ProofNode>,
         allowed_variable_names: HashSet<String>,
     ) -> Result<Proof, String> {
-        let units = Self::lines_to_units(&proof_lines)?;
-        Self::is_half_well_structured(&units)?; // check if proof is HALF-well-structured
-        let scope = Self::determine_scope(&units);
+        let nodes = Self::normalize_nodes(raw_nodes)?;
+        Self::is_half_well_structured(&nodes)?;
+        let scope = Self::determine_scope(&nodes);
 
-        Ok(Proof {
-            lines: proof_lines,
-            scope,
-            units,
-            allowed_variable_names,
+        Ok(Proof { nodes, scope, allowed_variable_names })
+    }
+
+    pub fn nodes(&self) -> &[ProofNode] {
+        &self.nodes
+    }
+
+    pub fn numbered_lines(&self) -> impl Iterator<Item = &NumberedLine> {
+        self.nodes.iter().filter_map(|node| node.as_numbered())
+    }
+
+    pub fn find_numbered_line(&self, line_num: usize) -> Option<&NumberedLine> {
+        self.nodes.iter().find_map(|node| match node {
+            ProofNode::Numbered(line) if line.line_num == line_num => Some(line),
+            _ => None,
         })
     }
 
-    /// From a vector of [ProofLine]s, this function generates a vector of [ProofUnit]s which are useful during analysis.
-    fn lines_to_units(proof_lines: &[ProofLine]) -> Result<Vec<ProofUnit>, String> {
-        let mut units: Vec<ProofUnit> = vec![];
-        let mut prev_depth = 1;
-        let mut last_line_num = 0;
-
-        // translate the proof to `ProofUnit`s
-        for line in proof_lines {
-            if line.depth == prev_depth + 1 {
-                units.push(ProofUnit::SubproofOpen);
-            } else if line.depth + 1 == prev_depth {
-                units.push(ProofUnit::SubproofClose);
-            } else if line.depth != prev_depth {
-                return Err(format!("near line {}, there is an \'indentation/scope jump\' that is too big. You cannot open or close two subproofs in the same line.",last_line_num+1));
-            }
-            if let Some(line_num) = line.line_num {
-                last_line_num = line_num;
-                if line.justification.is_none() && line.constant_between_square_brackets.is_none() {
-                    units.push(ProofUnit::NumberedProofLineWithoutJustificationWithoutBoxedConstant(line_num));
-                } else if line.justification.is_none() {
-                    units.push(ProofUnit::NumberedProofLineThatIntroducesBoxedConstant(line_num));
-                } else {
-                    units.push(ProofUnit::NumberedProofLineWithJustification(line_num));
-                }
-            }
-            if line.is_fitch_bar_line {
-                units.push(ProofUnit::FitchBarLine);
-            }
-            prev_depth = line.depth;
-        }
-        Ok(units)
+    pub fn last_numbered_line(&self) -> Option<&NumberedLine> {
+        self.nodes.iter().rev().find_map(|node| node.as_numbered())
     }
 
     /// This function computes the [Scope] of a proof.
-    fn determine_scope(units: &[ProofUnit]) -> Scope {
-        let last_line_number: usize = units
+    /// This function computes the [Scope] of a proof.
+    fn determine_scope(nodes: &[ProofNode]) -> Scope {
+        let last_line_number: usize = nodes
             .iter()
-            .filter_map(|u| match u {
-                ProofUnit::NumberedProofLineWithoutJustificationWithoutBoxedConstant(num)
-                | ProofUnit::NumberedProofLineWithJustification(num) => Some(*num),
+            .filter_map(|node| match node {
+                ProofNode::Numbered(line) => Some(line.line_num),
                 _ => None,
             })
             .last()
-            .unwrap();
+            .expect("Couldn't find the last numberd lined in a proof - panic");
         let mut scope: Scope = vec![(vec![], vec![]); last_line_number + 1];
-        for i in 0..units.len() {
-            if let ProofUnit::NumberedProofLineWithJustification(num) = units[i] {
-                // used to find referenceable single lines
-                let mut depth: i32 = 0;
 
-                // used to find referenceable subproofs
-                let mut stack: Vec<usize> = vec![];
+        for (idx, node) in nodes.iter().enumerate() {
+            let Some(line) = node.as_numbered() else {
+                continue;
+            };
+            if !line.is_inference() {
+                continue;
+            }
+            let line_num = line.line_num;
+            let mut depth: i32 = 0;
+            let mut stack: Vec<usize> = vec![];
 
-                for j in (0..i).rev() {
-                    match units[j] {
-                        ProofUnit::SubproofOpen => {
-                            if depth > 0 {
-                                depth -= 1;
-                                let subproof_begin;
-                                if let ProofUnit::NumberedProofLineWithoutJustificationWithoutBoxedConstant(
-                                    s_begin,
-                                ) = units[j + 1]
-                                {
-                                    subproof_begin = s_begin;
-                                } else if let ProofUnit::NumberedProofLineThatIntroducesBoxedConstant(
-                                    s_begin,
-                                ) = units[j + 1]
-                                {
-                                    subproof_begin = s_begin;
-                                } else {
-                                    panic!("This really should not happen. This is a mistake by the developer. Please contact me if you get this.");
-                                }
-                                let subproof_end = stack.pop().expect("This is a mistake by the developer. Please contact me if you get this.");
-                                if stack.is_empty() {
-                                    scope[num].1.push((subproof_begin, subproof_end));
-                                }
+            for j in (0..idx).rev() {
+                match &nodes[j] {
+                    ProofNode::SubproofOpen {
+                        ..
+                    } => {
+                        if depth > 0 {
+                            depth -= 1;
+                            let subproof_begin = nodes[j + 1..]
+                                .iter()
+                                .find_map(|node| node.as_numbered())
+                                .map(|premise| premise.line_num)
+                                .expect("This really should not happen. This is a mistake by the developer. Please contact me if you get this.");
+                            let subproof_end = stack.pop().expect("This is a mistake by the developer. Please contact me if you get this.");
+                            if stack.is_empty() {
+                                scope[line_num].1.push((subproof_begin, subproof_end));
                             }
                         }
-                        ProofUnit::SubproofClose => {
-                            depth += 1;
-                            if let ProofUnit::NumberedProofLineWithJustification(subproof_end) =
-                                units[j - 1]
-                            {
-                                stack.push(subproof_end);
-                            } else if let ProofUnit::NumberedProofLineWithoutJustificationWithoutBoxedConstant(
-                                subproof_end,
-                            ) = units[j - 1]
-                            {
-                                stack.push(subproof_end);
-                            } else if let ProofUnit::NumberedProofLineThatIntroducesBoxedConstant(
-                                subproof_end,
-                            ) = units[j - 1]
-                            {
-                                stack.push(subproof_end);
-                            } else {
-                                panic!("This really should not happen. This is a mistake by the developer. Please contact me if you get this.");
-                            }
-                        }
-                        ProofUnit::NumberedProofLineWithJustification(ref_num)
-                        | ProofUnit::NumberedProofLineThatIntroducesBoxedConstant(ref_num)
-                        | ProofUnit::NumberedProofLineWithoutJustificationWithoutBoxedConstant(ref_num) => {
-                            if depth == 0 {
-                                scope[num].0.push(ref_num);
-                            }
-                        }
-                        _ => {}
                     }
+                    ProofNode::SubproofClose {
+                        ..
+                    } => {
+                        depth += 1;
+                        let subproof_end = nodes[..j]
+                            .iter()
+                            .rev()
+                            .find_map(|node| node.as_numbered())
+                            .map(|last_line| last_line.line_num)
+                            .expect("This really should not happen. This is a mistake by the developer. Please contact me if you get this.");
+                        stack.push(subproof_end);
+                    }
+                    ProofNode::Numbered(prev_line) => {
+                        if depth == 0 {
+                            scope[line_num].0.push(prev_line.line_num);
+                        }
+                    }
+                    _ => {}
                 }
             }
         }
@@ -215,154 +193,208 @@ impl Proof {
     /// basically allow the user to not write a justification for the time being. In that case it
     /// will be parsed as a premise, so that's why we allow premises. This function won't complain
     /// about it, but of course, this will be checked when the proof is assessed for full correctness.
-    fn is_half_well_structured(units: &[ProofUnit]) -> Result<(), String> {
-        // traverse the `ProofUnit`s to check validity of the proof
-        // basically, for each "proof unit", we check that the units after that are allowed.
-        if units.is_empty() {
-            return Err("Your proof appears to be empty.".to_string());
-        }
-        match units[0] {
-            ProofUnit::FitchBarLine => {}
-            ProofUnit::NumberedProofLineWithoutJustificationWithoutBoxedConstant(_) => {}
-            _ => {
-                return Err("Error: proof should start with premises (or \
-                Fitch bar, if there are no premises)."
-                    .to_string())
+    fn is_half_well_structured(nodes: &[ProofNode]) -> Result<(), String> {
+        // traverse the structural nodes to check validity of the proof
+        // basically, for each node, we check that the nodes after that are allowed.
+
+        // Helper function for grabbing the next non-empty line
+        fn next_meaningful(nodes: &[ProofNode], mut idx: usize) -> Option<usize> {
+            while idx < nodes.len() {
+                if !matches!(nodes[idx], ProofNode::Empty { .. }) {
+                    return Some(idx);
+                }
+                idx += 1;
             }
+            None
         }
-        for i in 0..units.len() {
-            match units[i] {
-                ProofUnit::FitchBarLine => {
-                    // in HALF-well-structured proofs, a Fitch bar line may be succeeded by:
-                    //  - an inference
-                    //  - a premise without boxed constant (inference for which the user didn't write justification yet)
-                    //  - a new subproof
-                    //    and a proof MUST NOT end with a Fitch bar line.
-                    if i + 1 == units.len() {
+
+        // if all the lines are empty then the proof is empty
+        let Some(first_idx) = next_meaningful(nodes, 0) else {
+            return Err("Your proof appears to be empty.".to_string());
+        };
+
+        // a proof can start with a fitch bar or with a numbered premise
+        match &nodes[first_idx] {
+            ProofNode::FitchBar {
+                ..
+            } => {}
+            ProofNode::Numbered(line) if !line.is_inference() => {}
+            _ => return Err(
+                "Error: proof should start with premises (or Fitch bar, if there are no premises)."
+                    .to_string(),
+            ),
+        }
+
+        for i in 0..nodes.len() {
+            match &nodes[i] {
+                ProofNode::Empty {
+                    ..
+                } => {}
+
+                // in HALF-well-structured proofs, a Fitch bar line may be succeeded by:
+                //  - an inference
+                //  - a premise without boxed constant (inference for which the user didn't write justification yet)
+                //  - a new subproof
+                //    and a proof must NOT end with a Fitch bar line       
+                ProofNode::FitchBar {
+                    ..
+                } => {
+                    let Some(next_idx) = next_meaningful(nodes, i + 1) else {
                         return Err("The proof ends with a Fitch bar.".to_string());
-                    } else {
-                        match units[i + 1] {
-                            ProofUnit::NumberedProofLineWithJustification(_) => {}
-                            ProofUnit::SubproofOpen => {}
-                            ProofUnit::NumberedProofLineWithoutJustificationWithoutBoxedConstant(_) => {}
-                            _ => {
-                                return Err("Error: Fitch bars should be followed by \
-                                           either a new subproof or an inference. \
-                                           You might be missing a justification."
-                                    .to_string());
-                            }
+                    };
+                    match &nodes[next_idx] {
+                        ProofNode::Numbered(line) if line.is_inference() => {}
+                        ProofNode::SubproofOpen {
+                            ..
+                        } => {}
+                        ProofNode::Numbered(line)
+                            if !line.is_inference() && !line.introduces_boxed_constant() => {}
+                        _ => {
+                            return Err("Error: Fitch bars should be followed by either a new subproof or an inference. You might be missing a justification.".to_string());
                         }
                     }
                 }
-                ProofUnit::SubproofOpen => {
-                    // in HALF-well-structured proofs, after a subproof is opened, there must be:
-                    //  - EXACTLY one numbered premise, FOLLOWED by a Fitch bar
-                    if i + 1 == units.len() || i + 2 == units.len() {
-                        return Err("Error: this proof ends with an opened \
-                                   subproof in a way that should not be."
-                            .to_string());
-                    }
-                    match units[i + 1] {
-                        ProofUnit::NumberedProofLineWithoutJustificationWithoutBoxedConstant(_)
-                        | ProofUnit::NumberedProofLineThatIntroducesBoxedConstant(_) => {}
+
+                // in HALF-well-tructure proofs, after a subproof is opened, there must be:
+                //  - EXACTLY one numbered premise, FOLLOWED by a Fitch bar
+                ProofNode::SubproofOpen {
+                    ..
+                } => {
+                    let Some(prem_idx) = next_meaningful(nodes, i + 1) else {
+                        return Err("Error: this proof ends with an opened subproof in a way that should not be.".to_string());
+                    };
+                    match &nodes[prem_idx] {
+                        ProofNode::Numbered(line) if !line.is_inference() => {}
                         _ => {
                             return Err(
                                 "Error: the first line on any new subproof should be a premise."
                                     .to_string(),
-                            )
+                            );
                         }
                     }
-                    match units[i + 2] {
-                        ProofUnit::FitchBarLine => {}
+                    let Some(bar_idx) = next_meaningful(nodes, prem_idx + 1) else {
+                        return Err("Error: this proof ends with an opened subproof in a way that should not be.".to_string());
+                    };
+                    match &nodes[bar_idx] {
+                        ProofNode::FitchBar {
+                            ..
+                        } => {}
                         _ => {
-                            return Err("Error: a subproof should have exactly one \
-                                         premise, followed by a Fitch bar."
-                                .to_string())
+                            return Err("Error: a subproof should have exactly one premise, followed by a Fitch bar.".to_string());
                         }
                     }
                 }
-                ProofUnit::SubproofClose => {
-                    // in HALF-well-structured proofs, after a closed subproof there should be either:
-                    //  - an inference
-                    //  - a premise without boxed constant (inference for which user didn't write justification yet)
-                    //  - a new subproof
-                    //    and a proof MAY end directly after a closed subproof.
-                    if i + 1 == units.len() {
-                        if false {
-                            return Err("Error: the proof ends with the closing of a subproof.\
-                                       The last line of the proof should always be top-level."
-                                .to_string());
-                        }
-                    } else {
-                        match units[i + 1] {
-                            ProofUnit::NumberedProofLineWithJustification(_) => {}
-                            ProofUnit::SubproofOpen => {}
-                            ProofUnit::NumberedProofLineWithoutJustificationWithoutBoxedConstant(_) => {}
+
+                // in HALF-well-structured proofs, after a closed subproof there should be either:
+                //  - an inference
+                //  - a premise without boxed constant (inference for which user didn't write justification yet)
+                //  - a new subproof
+                ProofNode::SubproofClose {
+                    ..
+                } => {
+                    if let Some(next_idx) = next_meaningful(nodes, i + 1) {
+                        match &nodes[next_idx] {
+                            ProofNode::Numbered(line) if line.is_inference() => {}
+                            ProofNode::SubproofOpen {
+                                ..
+                            } => {}
+                            ProofNode::Numbered(line)
+                                if !line.is_inference() && !line.introduces_boxed_constant() => {}
                             _ => {
-                                return Err("Error: after closing a subproof, either you \
-                                     should open a new subproof or there should be \
-                                     an inference. Maybe you are missing some justification."
-                                    .to_string())
-                            }
-                        }
-                    }
-                }
-                ProofUnit::NumberedProofLineWithJustification(_) => {
-                    // in HALF-well-structured proofs, after an inference there should be either:
-                    //  - the end of the subproof
-                    //  - the opening of a new subproof
-                    //  - another inference
-                    //  - a premise without boxed constant (i.e. in this case an inference without justification)
-                    //    and a proof MAY end directly after an inference.
-                    if i + 1 < units.len() {
-                        match units[i + 1] {
-                            ProofUnit::NumberedProofLineWithJustification(_)
-                            | ProofUnit::SubproofOpen
-                            | ProofUnit::SubproofClose => {}
-                            ProofUnit::NumberedProofLineWithoutJustificationWithoutBoxedConstant(_) => {}
-                            ProofUnit::FitchBarLine => {
-                                return Err("Error: you cannot have a Fitch bar \
-                                        after an inference. Maybe you are giving \
-                                        justification for a premise?"
-                                    .to_string());
-                            }
-                            ProofUnit::NumberedProofLineThatIntroducesBoxedConstant(_) =>{
-                                return Err("Error: a boxed constant can only be introduced in the premise of a subproof".to_owned())
-                            }
-                        }
-                    }
-                }
-                ProofUnit::NumberedProofLineWithoutJustificationWithoutBoxedConstant(_) => {
-                    // in HALF-well-structured proofs, after a premise w/out b.c. there should be either:
-                    //  - a Fitch bar line
-                    //  - another premise without boxed constant
-                    //       (only at the beginning of the proof, but we already check for
-                    //        that in the ProofUnit::SubproofOpen arm of this match expression)
-                    //  - an inference
-                    //  - a SubproofOpen
-                    //  - a SubproofClose
-                    //    and a proof MAY end directly after a premise without b.c.
-                    //
-                    if i + 1 < units.len() {
-                        match units[i+1] {
-                            ProofUnit::FitchBarLine | ProofUnit::NumberedProofLineWithoutJustificationWithoutBoxedConstant(_) | ProofUnit::NumberedProofLineWithJustification(_) | ProofUnit::SubproofOpen | ProofUnit::SubproofClose => {}
-                            ProofUnit::NumberedProofLineThatIntroducesBoxedConstant(_) => {
-                                return Err("Error: a boxed constant can only be introduced in the premise of a subproof".to_owned())
+                                return Err("Error: after closing a subproof, either you should open a new subproof or there should be an inference. Maybe you are missing some justification.".to_string());
                             }
                         }
                     }
                 }
 
-                ProofUnit::NumberedProofLineThatIntroducesBoxedConstant(_) => {
-                    // in HALF-well-structured proofs, after a premise with b.c. there must be:
-                    //  - a Fitch bar line
-                    //    and a proof MUST NOT end directly after a premise with b.c.
 
-                    if i + 1 >= units.len() {
+                   // in HALF-well-structured proofs, after an inference there should be either:
+                   //  - the end of the subproof
+                   //  - the opening of a new subproof
+                   //  - another inference
+                   //  - a premise without boxed constant (i.e. in this case an inference without justification)
+                ProofNode::Numbered(line)
+                    if line.is_inference() =>
+                {
+                    if let Some(next_idx) = next_meaningful(nodes, i + 1) {
+                        match &nodes[next_idx] {
+                            ProofNode::Numbered(next_line) if next_line.is_inference() => {}
+                            ProofNode::SubproofOpen {
+                                ..
+                            } => {}
+                            ProofNode::SubproofClose {
+                                ..
+                            } => {}
+                            ProofNode::Numbered(next_line)
+                                if !next_line.is_inference()
+                                    && !next_line.introduces_boxed_constant() => {}
+                            ProofNode::FitchBar {
+                                ..
+                            } => {
+                                return Err("Error: you cannot have a Fitch bar after an inference. Maybe you are giving justification for a premise?".to_string());
+                            }
+                            ProofNode::Numbered(next_line)
+                                if !next_line.is_inference()
+                                    && next_line.introduces_boxed_constant() =>
+                            {
+                                return Err("Error: a boxed constant can only be introduced in the premise of a subproof".to_owned());
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+
+                // in HALF-well-structured proofs, after a premise w/out b.c. there should be either:
+                //  - a Fitch bar line
+                //  - another premise without boxed constant
+                //       (only at the beginning of the proof, but we already check for
+                //        that in the StructuralNode::SubproofOpen arm of this match expression)
+                //  - an inference
+                //  - a SubproofOpen
+                //  - a SubproofClose
+                //    and a proof MAY end directly after a premise without b.c.
+                ProofNode::Numbered(line)
+                    if !line.is_inference() && !line.introduces_boxed_constant() =>
+                {
+                    if let Some(next_idx) = next_meaningful(nodes, i + 1) {
+                        match &nodes[next_idx] {
+                            ProofNode::FitchBar {
+                                ..
+                            } => {}
+                            ProofNode::Numbered(next_line)
+                                if !next_line.is_inference()
+                                    && !next_line.introduces_boxed_constant() => {}
+                            ProofNode::Numbered(next_line) if next_line.is_inference() => {}
+                            ProofNode::SubproofOpen {
+                                ..
+                            }
+                            | ProofNode::SubproofClose {
+                                ..
+                            } => {}
+                            ProofNode::Numbered(next_line)
+                                if !next_line.is_inference()
+                                    && next_line.introduces_boxed_constant() =>
+                            {
+                                return Err("Error: a boxed constant can only be introduced in the premise of a subproof".to_owned());
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+                
+                // in HALF-well-structured proofs, after a premise with b.c. there must be:
+                //  - a Fitch bar line
+                //    and a proof MUST NOT end directly after a premise with b.c.
+                ProofNode::Numbered(line)
+                    if line.introduces_boxed_constant() =>
+                {
+                    let Some(next_idx) = next_meaningful(nodes, i + 1) else {
                         return Err("Error: a proof cannot end with a premise.".to_owned());
-                    }
-                    match units[i + 1] {
-                        ProofUnit::FitchBarLine => {}
+                    };
+                    match &nodes[next_idx] {
+                        ProofNode::FitchBar {
+                            ..
+                        } => {}
                         _ => {
                             return Err(
                                 "Error: after a premise, there should be a Fitch bar".to_owned()
@@ -370,23 +402,22 @@ impl Proof {
                         }
                     }
                 }
+                ProofNode::Numbered(_) => {}
             }
         }
 
         // last but not least: check that the line numbers are correct...
         // they must start at 1 and increase in steps of 1
-        let mut prev_num = 0;
-        for unit in units {
-            match unit {
-                ProofUnit::NumberedProofLineThatIntroducesBoxedConstant(num)
-                | ProofUnit::NumberedProofLineWithoutJustificationWithoutBoxedConstant(num)
-                | ProofUnit::NumberedProofLineWithJustification(num) => {
-                    if *num != 1 + prev_num {
-                        return Err(format!("Line numbers are wrong; discrepancy between line {prev_num} and {num}..."));
-                    }
-                    prev_num = *num;
+        let mut prev_num: usize = 0;
+        for node in nodes.iter() {
+            if let ProofNode::Numbered(line) = node {
+                if line.line_num != prev_num + 1 {
+                    return Err(format!(
+                        "Line numbers are wrong; discrepancy between line {prev_num} and {num}...",
+                        num = line.line_num
+                    ));
                 }
-                _ => {}
+                prev_num = line.line_num;
             }
         }
 
