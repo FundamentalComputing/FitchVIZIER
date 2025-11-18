@@ -1,0 +1,5 @@
+1 | ∀x (H(x) → M(x))
+2 | H(socrates)
+  |----
+3 | H(s*ocrates)  M(socrates)         ∀ Elim: 1
+4 | M(socrates)                       → Elim: 3,2
