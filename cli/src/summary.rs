@@ -52,16 +52,16 @@ impl Summary {
     }
 }
 
-fn collect_summary(nodes: &[ProofNode]) -> Summary {
+fn collect_summary(nodes: &[WithLoc<ProofNode>]) -> Summary {
     let mut line_count = 0;
     let mut rules_used = initial_table();
     let mut max_depth = 0;
     
     // collect the table of all the used rules and the max depth
-    for line in nodes.iter().filter_map(ProofNode::as_numbered) {
+    for line in nodes.iter().filter_map(|node| node.value().as_numbered()) {
         line_count += 1;
         if line.depth > max_depth { max_depth = line.depth };
-        if let Some(justification) = &line.justification {
+        if let Some(justification) = line.justification() {
             let (connective, direction) = justification.rule_used();
             if let Some((_, stats))
                 = rules_used.iter_mut().find(|(c, _)| *c == connective) {

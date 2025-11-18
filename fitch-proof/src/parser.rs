@@ -1,8 +1,10 @@
 use std::collections::HashSet;
 use std::iter;
 use std::iter::from_fn;
-
 use crate::data::*;
+use crate::loc::{Location, WithLoc};
+
+type LToken = WithLoc<Token>;
 
 /// This function takes a string slice and tries to parse it as a full proof.
 ///
@@ -11,22 +13,27 @@ use crate::data::*;
 ///
 /// For a specification of the grammar that is used for parsing, see the documentation of the
 /// functions [parse_proof_line] and [parse_logical_expr].
-pub fn parse_fitch_proof(proof: &str) -> Result<Vec<ProofNode>, String> {
+pub fn parse_fitch_proof(proof: &str) -> Result<Vec<LProofNode>, String> {
     let mut last_line_num = 0;
     proof
         .lines()
-        .filter(|s| !s.is_empty())
-        .map(|x| match lex(x) {
-            Ok(toks) => match parse_proof_line(&toks) {
-                Ok(node) => {
-                    if let Some(numbered) = node.as_numbered() {
-                        last_line_num = numbered.line_num;
+        .enumerate()
+        .filter_map(|(idx, line)| {
+            if line.is_empty() {
+                return None;
+            }
+            Some(match lex_with_line(line, Some(idx + 1)) {
+                Ok(toks) => match parse_proof_line(&toks) {
+                    Ok(node) => {
+                        if let Some(numbered) = node.value().as_numbered() {
+                            last_line_num = numbered.line_num;
+                        }
+                        Ok(node)
                     }
-                    Ok(node)
-                }
-                Err(err) => Err(format!("parser failure near line {}: {}", last_line_num + 1, err)),
-            },
-            Err(err) => Err(format!("lexer failure near line {}: {}", last_line_num + 1, err)),
+                    Err(err) => Err(format!("parser failure near line {}: {}", last_line_num + 1, err)),
+                },
+                Err(err) => Err(format!("lexer failure near line {}: {}", last_line_num + 1, err)),
+            })
         })
         .collect()
 }
@@ -48,14 +55,17 @@ pub fn parse_allowed_variable_names(allowed_var_names: &str) -> Result<HashSet<S
         }
     };
     let err_str = "the list of allowed variable names could not be parsed".to_string();
-    if toks.iter().any(|tok| !matches!(tok, Token::Name(_) | Token::Comma)) {
+    if toks.iter().any(|tok| !matches!(tok.value(), Token::Name(_) | Token::Comma)) {
         return Err(err_str);
     }
     let mut allowed_variable_names: HashSet<String> = HashSet::from([]);
     let mut rem_toks = toks.as_slice();
 
     loop {
-        let Some(Token::Name(var_name)) = rem_toks.first() else {
+        let Some(first_tok) = rem_toks.first() else {
+            return Err(err_str);
+        };
+        let Token::Name(var_name) = first_tok.value() else {
             return Err(err_str);
         };
         if !var_name.chars().next().unwrap().is_ascii_lowercase() {
@@ -68,7 +78,7 @@ pub fn parse_allowed_variable_names(allowed_var_names: &str) -> Result<HashSet<S
         if rem_toks.len() == 1 {
             break;
         }
-        if !matches!(rem_toks[1], Token::Comma) {
+        if !matches!(rem_toks[1].value(), Token::Comma) {
             return Err(err_str);
         }
         rem_toks = &rem_toks[2..];
@@ -114,7 +124,7 @@ pub fn parse_allowed_variable_names(allowed_var_names: &str) -> Result<HashSet<S
 /// <PredicateName> : some string starting with an UPPERCASE letter
 /// <AtomicPropositionName> : some string starting with an UPPERCASE letter
 /// ```
-pub fn parse_logical_expression_string(expr: &str) -> Option<Wff> {
+pub fn parse_logical_expression_string(expr: &str) -> Option<LWff> {
     if let Ok(toks) = lex(expr) {
         return match parse_logical_expr(&toks) {
             Ok(expr) => Some(expr),
@@ -128,7 +138,7 @@ pub fn parse_logical_expression_string(expr: &str) -> Option<Wff> {
 
 /// This is an enum containing tokens. The lexer converts a [String] to a vector of [Token]s, which
 /// can then be used by the parser.
-#[derive(PartialEq, Debug)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 enum Token {
     Name(String),
     LPar,
@@ -152,58 +162,70 @@ enum Token {
 }
 
 /// Generate a list of [Token]s from a [String]. If the lexer fails, a nice error message is returned.
-fn lex(input: &str) -> Result<Vec<Token>, String> {
-    let mut toks: Vec<Token> = Vec::new();
+fn lex(input: &str) -> Result<Vec<LToken>, String> {
+    lex_with_line(input, None)
+}
+
+fn lex_with_line(input: &str, line_number: Option<usize>) -> Result<Vec<LToken>, String> {
+    let mut toks: Vec<LToken> = Vec::new();
     let mut input_iter = input.chars().peekable();
+    let line = line_number.unwrap_or(1);
+    let mut column = 0usize;
 
     while let Some(ch) = input_iter.next() {
+        column += 1;
         match ch {
-            ' ' => {} // ignore spaces
-            '(' => toks.push(Token::LPar),
-            ')' => toks.push(Token::RPar),
-            '\u{2200}' => toks.push(Token::Forall),
-            '\u{2203}' => toks.push(Token::Exists),
-            '\u{2227}' => toks.push(Token::And),
-            '\u{2228}' => toks.push(Token::Or),
-            '\u{2192}' => toks.push(Token::Implies),
-            '\u{2194}' => toks.push(Token::Bicond),
-            '\u{00AC}' => toks.push(Token::Not),
-            ',' => toks.push(Token::Comma),
-            '=' => toks.push(Token::Equals),
+            ' ' | '\t' => {} // ignore spaces
+            '(' => toks.push(WithLoc::new(Token::LPar, Location::new(None, line, column))),
+            ')' => toks.push(WithLoc::new(Token::RPar, Location::new(None, line, column))),
+            '\u{2200}' => toks.push(WithLoc::new(Token::Forall, Location::new(None, line, column))),
+            '\u{2203}' => toks.push(WithLoc::new(Token::Exists, Location::new(None, line, column))),
+            '\u{2227}' => toks.push(WithLoc::new(Token::And, Location::new(None, line, column))),
+            '\u{2228}' => toks.push(WithLoc::new(Token::Or, Location::new(None, line, column))),
+            '\u{2192}' => toks.push(WithLoc::new(Token::Implies, Location::new(None, line, column))),
+            '\u{2194}' => toks.push(WithLoc::new(Token::Bicond, Location::new(None, line, column))),
+            '\u{00AC}' => toks.push(WithLoc::new(Token::Not, Location::new(None, line, column))),
+            ',' => toks.push(WithLoc::new(Token::Comma, Location::new(None, line, column))),
+            '=' => toks.push(WithLoc::new(Token::Equals, Location::new(None, line, column))),
             'a'..='z' | 'A'..='Z' => {
                 let name = iter::once(ch)
                     .chain(from_fn(|| input_iter.by_ref().next_if(|c| c.is_ascii_alphabetic())))
                     .collect::<String>();
-                toks.push(Token::Name(name));
+                let loc_col = column;
+                column += name.len() - 1;
+                toks.push(WithLoc::new(Token::Name(name), Location::new(None, line, loc_col)));
             }
             '1'..='9' => {
-                let num: Result<usize, _> = iter::once(ch)
+                let num_str = iter::once(ch)
                     .chain(from_fn(|| input_iter.by_ref().next_if(|c| c.is_ascii_digit())))
-                    .collect::<String>()
-                    .parse();
+                    .collect::<String>();
                 let err = "there was an integer bigger than 999999999".to_string();
-                if let Ok(n) = num {
-                    if n > 999999999 {
-                        return Err(err);
+                let loc_col = column;
+                column += num_str.len() - 1;
+                match num_str.parse::<usize>() {
+                    Ok(n) if n <= 999_999_999 => {
+                        toks.push(WithLoc::new(Token::Number(n), Location::new(None, line, loc_col)))
                     }
-                    toks.push(Token::Number(n));
-                } else {
-                    return Err(err);
+                    _ => return Err(err),
                 }
             }
             '|' => {
-                let num: usize = iter::once(ch)
-                    .chain(from_fn(|| input_iter.by_ref().next_if(|c| c == &'|' || c == &' ')))
-                    .filter(|c| c == &'|')
-                    .collect::<String>()
-                    .len();
-                toks.push(Token::ConseqVertBar(num));
+                let bars: String = iter::once(ch)
+                    .chain(from_fn(|| input_iter.by_ref().next_if(|c| *c == '|' || *c == ' ')))
+                    .collect();
+                let count = bars.chars().filter(|c| *c == '|').count();
+                let loc_col = column;
+                column += bars.len() - 1;
+                toks.push(WithLoc::new(
+                    Token::ConseqVertBar(count),
+                    Location::new(None, line, loc_col),
+                ));
             }
-            ':' => toks.push(Token::Colon),
-            '-' => toks.push(Token::Dash),
-            '[' => toks.push(Token::LSqBracket),
-            ']' => toks.push(Token::RSqBracket),
-            '⊥' => toks.push(Token::Bottom),
+            ':' => toks.push(WithLoc::new(Token::Colon, Location::new(None, line, column))),
+            '-' => toks.push(WithLoc::new(Token::Dash, Location::new(None, line, column))),
+            '[' => toks.push(WithLoc::new(Token::LSqBracket, Location::new(None, line, column))),
+            ']' => toks.push(WithLoc::new(Token::RSqBracket, Location::new(None, line, column))),
+            '⊥' => toks.push(WithLoc::new(Token::Bottom, Location::new(None, line, column))),
             _ => {
                 let mut err: String = "invalid character found: ".to_owned();
                 err.push(ch);
@@ -221,10 +243,9 @@ fn lex(input: &str) -> Result<Vec<Token>, String> {
 ///
 /// The grammar: see documentation of [parser::parse_logical_expression_string].
 ///
-fn parse_logical_expr(toks: &[Token]) -> Result<Wff, String> {
+fn parse_logical_expr(toks: &[LToken]) -> Result<LWff, String> {
     if let Some((wff, rem_toks)) = parse_e1(toks) {
         if rem_toks.is_empty() {
-            // there should be no remaining tokens!
             return Ok(wff);
         } else {
             return Err("failed to parse logical expression".to_string());
@@ -234,63 +255,49 @@ fn parse_logical_expr(toks: &[Token]) -> Result<Wff, String> {
 }
 
 /// Parse an `<E1>` as defined by the grammar specified in the documentation of [parse_logical_expr].
-fn parse_e1(toks: &[Token]) -> Option<(Wff, &[Token])> {
-    // always accept the first <E2>
-    if let Some((wff, mut rem_toks)) = parse_e2(toks) {
-        if rem_toks.is_empty() {
-            return Some((wff, rem_toks));
-        }
-        return match rem_toks[0] {
-            // <E2> implies <E2>
-            Token::Implies => {
-                if let Some((wff2, rem_rem_toks)) = parse_e2(rem_toks.get(1..)?) {
-                    return Some((Wff::Implies(boxed_lwff(wff), boxed_lwff(wff2)), rem_rem_toks));
-                }
-                None
-            }
-            // <E2> implies <E2>
-            Token::Bicond => {
-                if let Some((wff2, rem_rem_toks)) = parse_e2(rem_toks.get(1..)?) {
-                    return Some((Wff::Bicond(boxed_lwff(wff), boxed_lwff(wff2)), rem_rem_toks));
-                }
-                None
-            }
-            // <E2> and <E2> {and <E2>}
-            Token::And => {
-                let mut conjs: Vec<Wff> = vec![wff];
-                while !rem_toks.is_empty() && rem_toks[0] == Token::And {
-                    if let Some((new_wff, rem_rem_toks)) = parse_e2(rem_toks.get(1..)?) {
-                        rem_toks = rem_rem_toks;
-                        conjs.push(new_wff);
-                    } else {
-                        return None;
-                    }
-                }
-                Some((Wff::And(vec_lwff(conjs)), rem_toks))
-            }
-            // <E2> or <E2> {or <E2>}
-            Token::Or => {
-                let mut disjs: Vec<Wff> = vec![wff];
-                while !rem_toks.is_empty() && rem_toks[0] == Token::Or {
-                    if let Some((new_wff, rem_rem_toks)) = parse_e2(rem_toks.get(1..)?) {
-                        rem_toks = rem_rem_toks;
-                        disjs.push(new_wff);
-                    } else {
-                        return None;
-                    }
-                }
-                Some((Wff::Or(vec_lwff(disjs)), rem_toks))
-            }
-            // found just a single <E2>
-            _ => Some((wff, rem_toks)),
-        };
+fn parse_e1(toks: &[LToken]) -> Option<(LWff, &[LToken])> {
+    let (first, mut rem) = parse_e2(toks)?;
+    if rem.is_empty() {
+        return Some((first, rem));
     }
 
-    None
+    match rem.first()?.value() {
+        Token::Implies => {
+            let (rhs, rem_rest) = parse_e2(rem.get(1..)?)?;
+            let loc = first.location().clone();
+            Some((WithLoc::new(Wff::Implies(Box::new(first), Box::new(rhs)), loc), rem_rest))
+        }
+        Token::Bicond => {
+            let (rhs, rem_rest) = parse_e2(rem.get(1..)?)?;
+            let loc = first.location().clone();
+            Some((WithLoc::new(Wff::Bicond(Box::new(first), Box::new(rhs)), loc), rem_rest))
+        }
+        Token::And => {
+            let mut items = vec![first];
+            while !rem.is_empty() && matches!(rem[0].value(), Token::And) {
+                let (next, rest) = parse_e2(rem.get(1..)?)?;
+                items.push(next);
+                rem = rest;
+            }
+            let loc = items.first()?.location().clone();
+            Some((WithLoc::new(Wff::And(items), loc), rem))
+        }
+        Token::Or => {
+            let mut items = vec![first];
+            while !rem.is_empty() && matches!(rem[0].value(), Token::Or) {
+                let (next, rest) = parse_e2(rem.get(1..)?)?;
+                items.push(next);
+                rem = rest;
+            }
+            let loc = items.first()?.location().clone();
+            Some((WithLoc::new(Wff::Or(items), loc), rem))
+        }
+        _ => Some((first, rem)),
+    }
 }
 
 /// Parse an `<E2>` as defined by the grammar specified in the documentation of [parse_logical_expr].
-fn parse_e2(toks: &[Token]) -> Option<(Wff, &[Token])> {
+fn parse_e2(toks: &[LToken]) -> Option<(LWff, &[LToken])> {
     // just <E3>
     if let Some((wff, rem_toks)) = parse_e3(toks) {
         return Some((wff, rem_toks));
@@ -298,9 +305,10 @@ fn parse_e2(toks: &[Token]) -> Option<(Wff, &[Token])> {
 
     // <Term> equals <Term>
     if let Some((term1, rem_toks1)) = parse_term(toks) {
-        if rem_toks1.first()? == &Token::Equals {
+        if matches!(rem_toks1.first()?.value(), Token::Equals) {
             if let Some((term2, rem_toks2)) = parse_term(rem_toks1.get(1..)?) {
-                return Some((Wff::Equals(dummy_lterm(term1), dummy_lterm(term2)), rem_toks2));
+                let loc = term1.location().clone();
+                return Some((WithLoc::new(Wff::Equals(term1, term2), loc), rem_toks2));
             }
         }
     }
@@ -309,61 +317,87 @@ fn parse_e2(toks: &[Token]) -> Option<(Wff, &[Token])> {
 }
 
 /// Parse an `<E3>` as defined by the grammar specified in the documentation of [parse_logical_expr].
-fn parse_e3(toks: &[Token]) -> Option<(Wff, &[Token])> {
-    match toks.first()? {
+fn parse_e3(toks: &[LToken]) -> Option<(LWff, &[LToken])> {
+    let first = toks.first()?;
+    match first.value() {
         Token::Name(name) if name.chars().next()?.is_uppercase() => {
             if let Some((terms, rem_toks)) = parse_arg_list(toks.get(1..)?) {
-                Some((Wff::PredApp(name.to_string(), vec_lterm(terms)), rem_toks))
+                let loc = first.location().clone();
+                Some((WithLoc::new(Wff::PredApp(name.to_string(), terms), loc), rem_toks))
             } else {
-                Some((Wff::Atomic(name.to_string()), &toks[1..]))
+                let loc = first.location().clone();
+                Some((WithLoc::new(Wff::Atomic(name.to_string()), loc), &toks[1..]))
             }
         }
         Token::Not => {
-            if let Some((wff, rem_toks)) = parse_e3(&toks[1..]) {
-                Some((Wff::Not(boxed_lwff(wff)), rem_toks))
+            if let Some((expr, rem_toks)) = parse_e3(&toks[1..]) {
+                let loc = first.location().clone();
+                Some((WithLoc::new(Wff::Not(Box::new(expr)), loc), rem_toks))
             } else {
                 None
             }
         }
         Token::LPar => {
-            if let Some((wff, rem_toks)) = parse_e1(&toks[1..]) {
-                if rem_toks.first()? == &Token::RPar {
-                    return Some((wff, &rem_toks[1..]));
+            if let Some((expr, rem_toks)) = parse_e1(&toks[1..]) {
+                if matches!(rem_toks.first()?.value(), Token::RPar) {
+                    return Some((expr, &rem_toks[1..]));
                 }
             }
             None
         }
-        Token::Forall => match toks.get(1)? {
-            Token::Name(name) if name.chars().next()?.is_lowercase() => {
-                if let Some((wff, rem_toks)) = parse_e3(toks.get(2..)?) {
-                    return Some((Wff::Forall(name.to_owned(), boxed_lwff(wff)), rem_toks));
-                }
-                None
+        Token::Forall => {
+            let next = toks.get(1)?;
+            let Token::Name(var) = next.value() else {
+                return None;
+            };
+            if !var.chars().next().is_some_and(|c| c.is_ascii_lowercase()) {
+                return None;
             }
-            _ => None,
-        },
-        Token::Exists => match toks.get(1)? {
-            Token::Name(name) if name.chars().next()?.is_lowercase() => {
-                if let Some((wff, rem_toks)) = parse_e3(toks.get(2..)?) {
-                    return Some((Wff::Exists(name.to_owned(), boxed_lwff(wff)), rem_toks));
-                }
-                None
+            if let Some((expr, rem_toks)) = parse_e3(&toks[2..]) {
+                let loc = first.location().clone();
+                return Some((
+                    WithLoc::new(Wff::Forall(var.to_owned(), Box::new(expr)), loc),
+                    rem_toks,
+                ));
             }
-            _ => None,
-        },
-        Token::Bottom => Some((Wff::Bottom, &toks[1..])),
+            None
+        }
+        Token::Exists => {
+            let next = toks.get(1)?;
+            let Token::Name(var) = next.value() else {
+                return None;
+            };
+            if !var.chars().next().is_some_and(|c| c.is_ascii_lowercase()) {
+                return None;
+            }
+            if let Some((expr, rem_toks)) = parse_e3(&toks[2..]) {
+                let loc = first.location().clone();
+                return Some((
+                    WithLoc::new(Wff::Exists(var.to_owned(), Box::new(expr)), loc),
+                    rem_toks,
+                ));
+            }
+            None
+        }
+        Token::Bottom => {
+            let loc = first.location().clone();
+            Some((WithLoc::new(Wff::Bottom, loc), &toks[1..]))
+        }
         _ => None,
     }
 }
 
 /// Parse a `<Term>` as defined by the grammar specified in the documentation of [parse_logical_expr].
-fn parse_term(toks: &[Token]) -> Option<(Term, &[Token])> {
-    match toks.first()? {
+fn parse_term(toks: &[LToken]) -> Option<(LTerm, &[LToken])> {
+    let first = toks.first()?;
+    match first.value() {
         Token::Name(name) => {
             if let Some((terms, rem_toks)) = parse_arg_list(&toks[1..]) {
-                Some((Term::FuncApp(name.to_string(), vec_lterm(terms)), rem_toks))
+                let loc = first.location().clone();
+                Some((WithLoc::new(Term::FuncApp(name.to_string(), terms), loc), rem_toks))
             } else {
-                Some((Term::Atomic(name.to_string()), &toks[1..]))
+                let loc = first.location().clone();
+                Some((WithLoc::new(Term::Atomic(name.to_string()), loc), &toks[1..]))
             }
         }
         _ => None,
@@ -371,16 +405,16 @@ fn parse_term(toks: &[Token]) -> Option<(Term, &[Token])> {
 }
 
 /// Parse an `<ArgList>` as defined by the grammar specified in the documentation of [parse_logical_expr].
-fn parse_arg_list(toks: &[Token]) -> Option<(Vec<Term>, &[Token])> {
-    if toks.first()? != &Token::LPar {
+fn parse_arg_list(toks: &[LToken]) -> Option<(Vec<LTerm>, &[LToken])> {
+    if !matches!(toks.first()?.value(), Token::LPar) {
         return None;
     }
 
-    let mut terms: Vec<Term> = vec![];
+    let mut terms: Vec<LTerm> = vec![];
 
     if let Some((term, mut rem_toks)) = parse_term(&toks[1..]) {
         terms.push(term);
-        while rem_toks.first()? == &Token::Comma {
+        while matches!(rem_toks.first()?.value(), Token::Comma) {
             if let Some((term2, rem_rem_toks)) = parse_term(rem_toks.get(1..)?) {
                 terms.push(term2);
                 rem_toks = rem_rem_toks;
@@ -389,7 +423,7 @@ fn parse_arg_list(toks: &[Token]) -> Option<(Vec<Term>, &[Token])> {
             }
         }
 
-        if rem_toks.first()? == &Token::RPar {
+        if matches!(rem_toks.first()?.value(), Token::RPar) {
             Some((terms, &rem_toks[1..]))
         } else {
             None
@@ -450,150 +484,195 @@ fn parse_arg_list(toks: &[Token]) -> Option<(Vec<Term>, &[Token])> {
 /// justification first (=Intro is the only justification without colon). For the rest, everything
 /// can just be done normally from left to right.
 
-fn parse_proof_line(toks: &[Token]) -> Result<ProofNode, String> {
-    if toks.contains(&Token::Colon)
-        || (toks.last() == Some(&Token::Name("Intro".to_string())) // special check for =Intro
-            && toks.get(toks.len() - 2) == Some(&Token::Equals))
-    {
-        // we know that in this case, <FitchProofLine> ::= <num> '|' { '|' } <E1> <Justification>
-        // since only a Justification can legally contain a colon token or end with =Intro
-        let colon_index: usize = toks.iter().position(|t| t == &Token::Colon).unwrap_or(toks.len());
-        // note that we set colon_index to toks.len() in case of =Intro
+fn parse_proof_line(toks: &[LToken]) -> Result<LProofNode, String> {
+    if toks.is_empty() {
+        return Err("one proof line appears to be empty".to_string());
+    }
 
-        if colon_index < 4 {
-            return Err("failed to parse proof line. The proof line contains a colon, but this colon appears so early that it cannot possibly be a justification".to_string());
-            // colon cannot appear this early in a sentence
-        }
-        let toks_before_justification: &[Token];
-        let toks_justification: &[Token];
-        if let Token::Name(name) = &toks[colon_index - 1] {
-            match name.as_str() {
-                "Reit" => {
-                    toks_before_justification = &toks[..colon_index - 1];
-                    toks_justification = &toks[colon_index - 1..];
-                }
-                "Intro" | "Elim" => {
-                    toks_before_justification = &toks[..colon_index - 2];
-                    toks_justification = &toks[colon_index - 2..];
-                }
-                _ => {
-                    return Err(format!("failed to parse justification. Expected \'Reit\', \'Intro\' or \'Elim\', found \'{name}\'. Note that capitalization matters!"));
-                }
-            }
+    let has_colon = toks.iter().any(|t| matches!(t.value(), Token::Colon));
+    let ends_with_intro = toks.len() >= 2
+        && matches!(toks.last().unwrap().value(), Token::Name(name) if name == "Intro")
+        && matches!(toks[toks.len() - 2].value(), Token::Equals);
 
-            if let (
-                Some(Token::Number(line_num)),
-                Some(Token::ConseqVertBar(depth)),
-                justific,
-                wff,
-            ) = (
-                toks_before_justification.first(),
-                toks_before_justification.get(1),
-                parse_justification(toks_justification)?,
-                parse_logical_expr(toks_before_justification.get(2..).unwrap_or(&[]))?,
-            ) {
-                Ok(ProofNode::Numbered(NumberedLine {
-                    line_num: *line_num,
-                    depth: *depth,
-                    sentence: Some(dummy_lwff(wff)),
-                    justification: Some(dummy_ljustification(justific)),
-                    boxed_constant: None,
-                }))
-            } else {
-                Err("a line with an inference should always start with a line number (integer), followed by at least one vertical bar.".to_string())
+    if has_colon || ends_with_intro {
+        parse_line_with_justification(toks)
+    } else {
+        parse_line_without_justification(toks)
+    }
+}
+
+fn parse_line_with_justification(toks: &[LToken]) -> Result<LProofNode, String> {
+    let colon_index =
+        toks.iter().position(|t| matches!(t.value(), Token::Colon)).unwrap_or(toks.len());
+    if colon_index < 4 {
+        return Err(
+            "failed to parse proof line. The proof line contains a colon, but this colon appears so early that it cannot possibly be a justification".to_string()
+        );
+    }
+
+    let (before_just, just_slice) = if let Token::Name(name) = toks[colon_index - 1].value() {
+        match name.as_str() {
+            "Reit" => (&toks[..colon_index - 1], &toks[colon_index - 1..]),
+            "Intro" | "Elim" => (&toks[..colon_index - 2], &toks[colon_index - 2..]),
+            _ => {
+                return Err(format!(
+                    "failed to parse justification. Expected 'Reit', 'Intro' or 'Elim', found '{name}'. Note that capitalization matters!"
+                ));
             }
-        } else {
-            Err("sentence contains a colon, which was expected to be preceded by \'Intro\', \'Elim\' or \'Reit\' (with that capitalization), but the parser did not find any of these.".to_string())
         }
     } else {
-        // Now we must be in one if these cases:
-        //  <num> '|' { '|' } <E1>
-        //  <num> '|' { '|' } '[' <ConstantName> ']' [ <E1> ]
-        //  '|' { '|' } - { - }
-        //  '|' { '|' }
-        if toks.first().is_none() {
-            return Err("one proof line appears to be empty".to_string());
-        }
-        match toks.first().unwrap() {
-            Token::Number(num) => {
-                let Some(Token::ConseqVertBar(depth)) = toks.get(1) else {
-                    return Err("after the line number, there should be at least one vertical bar"
-                        .to_string());
-                };
-                let mut const_betw_sqbr: Option<Term> = None;
-                let expression_start_index: usize = if let (
-                    Some(Token::LSqBracket),
-                    Some(Token::Name(name)),
-                    Some(Token::RSqBracket),
-                ) = (toks.get(2), toks.get(3), toks.get(4))
+        return Err("sentence contains a colon, which was expected to be preceded by 'Intro', 'Elim' or 'Reit', but the parser did not find any of these.".to_string());
+    };
+
+    let number_tok = before_just
+        .first()
+        .ok_or_else(|| "a proof line must start with a line number".to_string())?;
+    let depth_tok = before_just.get(1).ok_or_else(|| {
+        "after the line number, there should be at least one vertical bar".to_string()
+    })?;
+
+    let Token::Number(line_num) = number_tok.value() else {
+        return Err("a proof line with justification must start with a line number".to_string());
+    };
+    let Token::ConseqVertBar(depth) = depth_tok.value() else {
+        return Err("after the line number, there should be at least one vertical bar".to_string());
+    };
+
+    let sentence_tokens = before_just.get(2..).unwrap_or(&[]);
+    let sentence = parse_logical_expr(sentence_tokens)?;
+    let justification = parse_justification(just_slice)?;
+
+    let node_loc = number_tok.location().clone();
+    Ok(WithLoc::new(
+        ProofNode::Numbered(NumberedLine {
+            line_num: *line_num,
+            depth: *depth,
+            sentence: Some(sentence),
+            justification: Some(justification),
+            boxed_constant: None,
+        }),
+        node_loc,
+    ))
+}
+
+fn parse_line_without_justification(toks: &[LToken]) -> Result<LProofNode, String> {
+    let first = toks.first().unwrap();
+    match first.value() {
+        Token::Number(line_num) => {
+            let depth_tok = toks.get(1).ok_or_else(|| {
+                "after the line number, there should be at least one vertical bar".to_string()
+            })?;
+            let Token::ConseqVertBar(depth) = depth_tok.value() else {
+                return Err(
+                    "after the line number, there should be at least one vertical bar".to_string()
+                );
+            };
+
+            let mut const_between: Option<LTerm> = None;
+            let expression_start = if let (Some(lsq), Some(name_tok), Some(rsq)) =
+                (toks.get(2), toks.get(3), toks.get(4))
+            {
+                if !matches!(lsq.value(), Token::LSqBracket)
+                    || !matches!(rsq.value(), Token::RSqBracket)
                 {
-                    const_betw_sqbr = Some(Term::Atomic(name.to_string()));
-                    if !name.chars().next().unwrap_or('U').is_lowercase() {
-                        return Err("a boxed constant must be a constant; it should start with a lowercase letter".to_string());
+                    2
+                } else {
+                    let Token::Name(name) = name_tok.value() else {
+                        return Err("boxed constants must be names".to_string());
+                    };
+                    if !name.chars().next().unwrap_or('a').is_ascii_lowercase() {
+                        return Err(
+                            "a boxed constant must be a constant; it should start with a lowercase letter".to_string()
+                        );
                     }
+                    let loc = name_tok.location().clone();
+                    const_between = Some(WithLoc::new(Term::Atomic(name.to_string()), loc));
                     if toks.len() == 5 {
-                        // this premise contains only a boxed constant, no further expression:
-                        // early exit
-                        let boxed_constant = const_betw_sqbr.map(dummy_lterm);
-                        return Ok(ProofNode::Numbered(NumberedLine {
-                            line_num: *num,
-                            depth: *depth,
-                            sentence: None,
-                            justification: None,
-                            boxed_constant,
-                        }));
+                        let node_loc = first.location().clone();
+                        return Ok(WithLoc::new(
+                            ProofNode::Numbered(NumberedLine {
+                                line_num: *line_num,
+                                depth: *depth,
+                                sentence: None,
+                                justification: None,
+                                boxed_constant: const_between,
+                            }),
+                            node_loc,
+                        ));
                     }
                     5
-                } else {
-                    2
-                };
-
-                // give error if it seems like the user tried to make a boxed constant but failed
-                if (toks.contains(&Token::LSqBracket) || toks.contains(&Token::RSqBracket))
-                    && expression_start_index != 5
-                {
-                    return Err("failed when trying to read boxed constant (if \
-                        you did not intend to introduce a boxed constant in this \
-                        proof line, remove the characters \'[\' and \']\' from this line)"
-                        .to_string());
                 }
+            } else {
+                2
+            };
 
-                let wff = parse_logical_expr(toks.get(expression_start_index..).unwrap_or(&[]))?;
+            let has_brackets = toks.iter().any(|t| matches!(t.value(), Token::LSqBracket))
+                || toks.iter().any(|t| matches!(t.value(), Token::RSqBracket));
+            if has_brackets && expression_start != 5 {
+                return Err("failed when trying to read boxed constant (if you did not intend to introduce a boxed constant in this proof line, remove '[' and ']').".to_string());
+            }
 
-                Ok(ProofNode::Numbered(NumberedLine {
-                    line_num: *num,
+            let sentence_tokens = toks.get(expression_start..).unwrap_or(&[]);
+            let sentence = if sentence_tokens.is_empty() {
+                None
+            } else {
+                Some(parse_logical_expr(sentence_tokens)?)
+            };
+
+            if sentence.is_none() && const_between.is_none() {
+                return Err("a proof line must contain a sentence or introduce a boxed constant".to_string());
+            }
+
+            let node_loc = first.location().clone();
+            Ok(WithLoc::new(
+                ProofNode::Numbered(NumberedLine {
+                    line_num: *line_num,
                     depth: *depth,
-                    sentence: Some(dummy_lwff(wff)),
+                    sentence,
                     justification: None,
-                    boxed_constant: const_betw_sqbr.map(dummy_lterm),
-                }))
+                    boxed_constant: const_between,
+                }),
+                node_loc,
+            ))
+        }
+        Token::ConseqVertBar(depth) => {
+            let rest = &toks[1..];
+            if rest.iter().all(|t| matches!(t.value(), Token::Dash)) && !rest.is_empty() {
+                let loc = first.location().clone();
+                Ok(WithLoc::new(
+                    ProofNode::FitchBar {
+                        depth: *depth,
+                    },
+                    loc,
+                ))
+            } else if rest.is_empty() || rest.iter().all(|t| matches!(t.value(), Token::Dash)) {
+                let loc = first.location().clone();
+                Ok(WithLoc::new(
+                    ProofNode::Empty {
+                        depth: *depth,
+                    },
+                    loc,
+                ))
+            } else {
+                Err("when a line starts with only scope markers, it may only contain '-' after those markers.".to_string())
             }
-            Token::ConseqVertBar(depth) => {
-                if toks[1..].iter().all(|t| t == &Token::Dash) {
-                    if toks[1..].contains(&Token::Dash) {
-                        Ok(ProofNode::FitchBar {
-                            depth: *depth,
-                        })
-                    } else {
-                        Ok(ProofNode::Empty {
-                            depth: *depth,
-                        })
-                    }
-                } else {
-                    Err("when you have a line without line number, then that line can only possibly contain some minuses to indicate a Fitch bar, but it may contain no other tokens than minuses after the vertical bar(s)".to_string())
-                }
-            }
-            _ => {
-                Err("each text line must start either with a line number or a vertical bar"
-                    .to_string())
-            }
+        }
+        _ => {
+            Err("each text line must start either with a line number or a vertical bar".to_string())
         }
     }
 }
 
 /// Parse a justification, as specified by the grammar defined in the documentation for
 /// [parse_proof_line].
-fn parse_justification(toks: &[Token]) -> Result<Justification, String> {
+fn parse_justification(toks: &[LToken]) -> Result<LJustification, String> {
+    let plain: Vec<Token> = toks.iter().map(|tok| tok.value().clone()).collect();
+    let justification = parse_justification_tokens(&plain)?;
+    let loc = toks.first().map(|tok| tok.location().clone()).unwrap_or_else(Location::dummy);
+    Ok(WithLoc::new(justification, loc))
+}
+
+fn parse_justification_tokens(toks: &[Token]) -> Result<Justification, String> {
     if toks.first().is_none() || toks.get(1).is_none() {
         return Err("failure when parsing justification; it seems not to be there?".to_string());
     }
@@ -860,7 +939,7 @@ mod tests {
     #[test]
     fn test_lexer_1() {
         assert_eq!(
-            lex("   THIs is SoMe  SiLLY  test  "),
+            lex_tokens("   THIs is SoMe  SiLLY  test  "),
             Ok(vec![
                 Token::Name("THIs".to_owned()),
                 Token::Name("is".to_owned()),
@@ -874,7 +953,7 @@ mod tests {
     #[test]
     fn test_lexer_2() {
         assert_eq!(
-            lex("   THIs is SoMe  S∀LLY  test  "),
+            lex_tokens("   THIs is SoMe  S∀LLY  test  "),
             Ok(vec![
                 Token::Name("THIs".to_owned()),
                 Token::Name("is".to_owned()),
@@ -889,7 +968,7 @@ mod tests {
     #[test]
     fn test_lexer_3() {
         assert_eq!(
-            lex("   THIs is SoMe  S∀ ∀∀LLY  test  "),
+            lex_tokens("   THIs is SoMe  S∀ ∀∀LLY  test  "),
             Ok(vec![
                 Token::Name("THIs".to_owned()),
                 Token::Name("is".to_owned()),
@@ -906,7 +985,7 @@ mod tests {
     #[test]
     fn test_lexer_4() {
         assert_eq!(
-            lex("∀x(P(x,a)→P(a,x))∨ (A∧ ItIsSunny∧¬∃y P(y,y))∨a=c"),
+            lex_tokens("∀x(P(x,a)→P(a,x))∨ (A∧ ItIsSunny∧¬∃y P(y,y))∨a=c"),
             Ok(vec![
                 Token::Forall,
                 Token::Name("x".to_owned()),
@@ -949,92 +1028,157 @@ mod tests {
         );
     }
 
-    fn atom(name: &str) -> Wff {
-        Wff::Atomic(name.to_string())
+    fn lex_tokens(input: &str) -> Result<Vec<Token>, String> {
+        lex(input).map(|toks| toks.into_iter().map(|t| t.value().clone()).collect())
     }
 
-    fn and(children: Vec<Wff>) -> Wff {
-        Wff::And(vec_lwff(children))
+    fn lwff(wff: Wff) -> LWff {
+        WithLoc::new(wff, Location::dummy())
     }
 
-    fn or(children: Vec<Wff>) -> Wff {
-        Wff::Or(vec_lwff(children))
+    fn lterm(term: Term) -> LTerm {
+        WithLoc::new(term, Location::dummy())
     }
 
-    fn implies(lhs: Wff, rhs: Wff) -> Wff {
-        Wff::Implies(boxed_lwff(lhs), boxed_lwff(rhs))
+    fn strip_term_locations(term: LTerm) -> LTerm {
+        let WithLoc {
+            value,
+            ..
+        } = term;
+        let value = match value {
+            Term::Atomic(name) => Term::Atomic(name),
+            Term::FuncApp(name, args) => {
+                Term::FuncApp(name, args.into_iter().map(strip_term_locations).collect())
+            }
+        };
+        WithLoc::dummy(value)
     }
 
-    fn forall(var: &str, body: Wff) -> Wff {
-        Wff::Forall(var.to_string(), boxed_lwff(body))
+    fn strip_wff_locations(wff: LWff) -> LWff {
+        let WithLoc {
+            value,
+            ..
+        } = wff;
+        let sanitized = match value {
+            Wff::And(children) => Wff::And(children.into_iter().map(strip_wff_locations).collect()),
+            Wff::Or(children) => Wff::Or(children.into_iter().map(strip_wff_locations).collect()),
+            Wff::Implies(lhs, rhs) => {
+                Wff::Implies(Box::new(strip_wff_locations(*lhs)), Box::new(strip_wff_locations(*rhs)))
+            }
+            Wff::Bicond(lhs, rhs) => {
+                Wff::Bicond(Box::new(strip_wff_locations(*lhs)), Box::new(strip_wff_locations(*rhs)))
+            }
+            Wff::Not(inner) => Wff::Not(Box::new(strip_wff_locations(*inner))),
+            Wff::Bottom => Wff::Bottom,
+            Wff::Forall(var, body) => Wff::Forall(var, Box::new(strip_wff_locations(*body))),
+            Wff::Exists(var, body) => Wff::Exists(var, Box::new(strip_wff_locations(*body))),
+            Wff::Atomic(name) => Wff::Atomic(name),
+            Wff::PredApp(name, terms) => {
+                Wff::PredApp(name, terms.into_iter().map(strip_term_locations).collect())
+            }
+            Wff::Equals(lhs, rhs) => {
+                Wff::Equals(strip_term_locations(lhs), strip_term_locations(rhs))
+            }
+        };
+        WithLoc::dummy(sanitized)
     }
 
-    fn pred(name: &str, args: Vec<Term>) -> Wff {
-        Wff::PredApp(name.to_string(), vec_lterm(args))
+    fn parse_expr(expr: &str) -> Option<LWff> {
+        parse_logical_expression_string(expr).map(strip_wff_locations)
     }
 
-    fn eq_terms(left: Term, right: Term) -> Wff {
-        Wff::Equals(dummy_lterm(left), dummy_lterm(right))
+    #[allow(dead_code)]
+    fn func(name: &str, args: Vec<Term>) -> Term {
+        Term::FuncApp(name.to_string(), args.into_iter().map(lterm).collect())
+    }
+
+    fn atom(name: &str) -> LWff {
+        lwff(Wff::Atomic(name.to_string()))
+    }
+
+    fn and(children: Vec<LWff>) -> LWff {
+        lwff(Wff::And(children))
+    }
+
+    fn or(children: Vec<LWff>) -> LWff {
+        lwff(Wff::Or(children))
+    }
+
+    fn implies(lhs: LWff, rhs: LWff) -> LWff {
+        lwff(Wff::Implies(Box::new(lhs), Box::new(rhs)))
+    }
+
+    fn forall(var: &str, body: LWff) -> LWff {
+        lwff(Wff::Forall(var.to_string(), Box::new(body)))
+    }
+
+    fn pred(name: &str, args: Vec<Term>) -> LWff {
+        lwff(Wff::PredApp(
+            name.to_string(),
+            args.into_iter().map(lterm).collect(),
+        ))
+    }
+
+    fn eq_terms(left: Term, right: Term) -> LWff {
+        lwff(Wff::Equals(lterm(left), lterm(right)))
+    }
+
+    fn parse_justification_text(input: &str) -> Result<Justification, String> {
+        parse_justification(&lex(input).unwrap()).map(|j| j.value().clone())
     }
 
     #[test]
     fn test_parser_1() {
-        assert_eq!(parse_logical_expression_string("A∧B"), Some(and(vec![atom("A"), atom("B")])));
+        assert_eq!(parse_expr("A∧B"), Some(and(vec![atom("A"), atom("B")])));
     }
     #[test]
     fn test_parser_2() {
-        assert_eq!(parse_logical_expression_string("AB"), Some(atom("AB")));
+        assert_eq!(parse_expr("AB"), Some(atom("AB")));
     }
     #[test]
     fn test_parser_3() {
-        assert_eq!(parse_logical_expression_string("a∧B"), None);
+        assert_eq!(parse_expr("a∧B"), None);
     }
     #[test]
     fn test_parser_4() {
-        assert_eq!(parse_logical_expression_string("aAAA"), None);
+        assert_eq!(parse_expr("aAAA"), None);
     }
     #[test]
     fn test_parser_5() {
-        assert_eq!(parse_logical_expression_string("A∨B"), Some(or(vec![atom("A"), atom("B")])));
+        assert_eq!(parse_expr("A∨B"), Some(or(vec![atom("A"), atom("B")])));
     }
     #[test]
     fn test_parser_6() {
-        assert_eq!(parse_logical_expression_string("A∨∧B"), None);
+        assert_eq!(parse_expr("A∨∧B"), None);
     }
     #[test]
     fn test_parser_7() {
-        assert_eq!(parse_logical_expression_string("A→B"), Some(implies(atom("A"), atom("B"))));
+        assert_eq!(parse_expr("A→B"), Some(implies(atom("A"), atom("B"))));
     }
     #[test]
     fn test_parser_8() {
-        assert_eq!(parse_logical_expression_string("A→→→B"), None);
+        assert_eq!(parse_expr("A→→→B"), None);
     }
     #[test]
     fn test_parser_9() {
         assert_eq!(
-            parse_logical_expression_string("∀x(∀y P(x,y))"),
+            parse_expr("∀x(∀y P(x,y))"),
             Some(forall(
                 "x",
                 forall("y", pred("P", vec![Term::Atomic("x".into()), Term::Atomic("y".into())]))
             ))
         );
-        assert_eq!(
-            parse_logical_expression_string("∀x(∀y P(x,y))"),
-            parse_logical_expression_string("∀x∀y P(x,y)")
-        );
-        assert_eq!(
-            parse_logical_expression_string("∀x(∀y P(x,y))"),
-            parse_logical_expression_string("(∀x∀y P(x,y))")
-        );
+        assert_eq!(parse_expr("∀x(∀y P(x,y))"), parse_expr("∀x∀y P(x,y)"));
+        assert_eq!(parse_expr("∀x(∀y P(x,y))"), parse_expr("(∀x∀y P(x,y))"));
     }
     #[test]
     fn test_parser_10() {
-        assert_eq!(parse_logical_expression_string("∀(x∀y P(x,y))"), None);
+        assert_eq!(parse_expr("∀(x∀y P(x,y))"), None);
     }
     #[test]
     fn test_parser_11() {
         let expr1 = "∀x(P(a,b,x)→Q(f(a),f(b,c,d),g(x)))∨f(a,b)=f(bla,c)∨¬∃x¬¬¬∃y¬¬∀z¬¬(P(f(x),f(y),f(z))→¬(A(x)∧B(y)))";
-        let expected_result = parse_logical_expression_string(expr1);
+        let expected_result = parse_expr(expr1);
 
         // correct
 
@@ -1062,32 +1206,32 @@ mod tests {
         // wrong, same as expr1 but with one → removed
         let expr9 = "∀x(P(a,b,x)→Q(f(a),f(b,c,d),g(x)))∨f(a,b)=f(bla,c)∨¬∃x¬¬¬∃y¬¬∀z¬¬(P(f(x),f(y),f(z))¬(A(x)∧B(y)))";
 
-        assert_eq!(parse_logical_expression_string(expr1), expected_result);
-        assert_eq!(parse_logical_expression_string(expr2), expected_result);
-        assert_eq!(parse_logical_expression_string(expr3), None);
-        assert_eq!(parse_logical_expression_string(expr4), expected_result);
-        assert_eq!(parse_logical_expression_string(expr5), None);
-        assert_eq!(parse_logical_expression_string(expr6), None);
-        assert_eq!(parse_logical_expression_string(expr7), None);
-        assert_eq!(parse_logical_expression_string(expr8), None);
-        assert_eq!(parse_logical_expression_string(expr9), None);
+        assert_eq!(parse_expr(expr1), expected_result);
+        assert_eq!(parse_expr(expr2), expected_result);
+        assert_eq!(parse_expr(expr3), None);
+        assert_eq!(parse_expr(expr4), expected_result);
+        assert_eq!(parse_expr(expr5), None);
+        assert_eq!(parse_expr(expr6), None);
+        assert_eq!(parse_expr(expr7), None);
+        assert_eq!(parse_expr(expr8), None);
+        assert_eq!(parse_expr(expr9), None);
     }
     #[test]
     fn test_parser_12() {
-        assert_eq!(parse_logical_expression_string("A∨B∧C"), None);
+        assert_eq!(parse_expr("A∨B∧C"), None);
     }
     #[test]
     fn test_parser_13() {
-        assert_eq!(parse_logical_expression_string("A∧B∨B"), None);
+        assert_eq!(parse_expr("A∧B∨B"), None);
     }
     #[test]
     fn test_parser_14() {
-        assert_eq!(parse_logical_expression_string("a=b=b"), None);
+        assert_eq!(parse_expr("a=b=b"), None);
     }
     #[test]
     fn test_parser_15() {
         assert_eq!(
-            parse_logical_expression_string("a=b"),
+            parse_expr("a=b"),
             Some(eq_terms(Term::Atomic("a".to_string()), Term::Atomic("b".to_string())))
         );
     }
@@ -1095,54 +1239,51 @@ mod tests {
     #[test]
     fn test_justification_parser_or_elim() {
         assert_eq!(
-            parse_justification(&lex("∨Elim:42,43-44").unwrap()),
+            parse_justification_text("∨Elim:42,43-44"),
             Ok(Justification::OrElim(42, vec![(43, 44)]))
         );
         assert_eq!(
-            parse_justification(&lex("∨Elim:42,43-44,45-46,47-48").unwrap()),
+            parse_justification_text("∨Elim:42,43-44,45-46,47-48"),
             Ok(Justification::OrElim(42, vec![(43, 44), (45, 46), (47, 48)]))
         );
-        assert!(parse_justification(&lex("∨Elim:42,43-44,45-46,47,48").unwrap()).is_err());
-        assert!(parse_justification(&lex("∨Elim:42,43-44,45-46-47-48").unwrap()).is_err());
-        assert!(parse_justification(&lex("∨Elim:42-43-44,45-46,47-48").unwrap()).is_err());
-        assert!(parse_justification(&lex("∨Elim-42,43-44,45-46,47-48").unwrap()).is_err());
-        assert!(parse_justification(&lex("∨Elim:42,43-44,45-46,47-48,").unwrap()).is_err());
-        assert!(parse_justification(&lex("∨Elim:42,43-44,45-46,47-48,49").unwrap()).is_err());
-        assert!(parse_justification(&lex("∨Elim:42,43-44,45-46,47-48,49-").unwrap()).is_err());
-        assert!(parse_justification(&lex("∨Elim:42").unwrap()).is_err());
+        assert!(parse_justification_text("∨Elim:42,43-44,45-46,47,48").is_err());
+        assert!(parse_justification_text("∨Elim:42,43-44,45-46-47-48").is_err());
+        assert!(parse_justification_text("∨Elim:42-43-44,45-46,47-48").is_err());
+        assert!(parse_justification_text("∨Elim-42,43-44,45-46,47-48").is_err());
+        assert!(parse_justification_text("∨Elim:42,43-44,45-46,47-48,").is_err());
+        assert!(parse_justification_text("∨Elim:42,43-44,45-46,47-48,49").is_err());
+        assert!(parse_justification_text("∨Elim:42,43-44,45-46,47-48,49-").is_err());
+        assert!(parse_justification_text("∨Elim:42").is_err());
     }
     #[test]
     fn test_justification_parser_and_intro() {
         assert_eq!(
-            parse_justification(&lex("∧Intro:42,43,44").unwrap()),
+            parse_justification_text("∧Intro:42,43,44"),
             Ok(Justification::AndIntro(vec![42, 43, 44]))
         );
         assert_eq!(
-            parse_justification(&lex("∧Intro:42,43").unwrap()),
+            parse_justification_text("∧Intro:42,43"),
             Ok(Justification::AndIntro(vec![42, 43]))
         );
         assert_eq!(
-            parse_justification(&lex("∧Intro:42").unwrap()),
+            parse_justification_text("∧Intro:42"),
             // TODO: decide whether i want to keep behavior like this (a "unary conjunction")
             Ok(Justification::AndIntro(vec![42]))
         );
-        assert!((parse_justification(&lex("∧Intro:42-43").unwrap()).is_err()));
-        assert!((parse_justification(&lex("∧Intro:").unwrap()).is_err()));
+        assert!((parse_justification_text("∧Intro:42-43").is_err()));
+        assert!((parse_justification_text("∧Intro:").is_err()));
     }
     #[test]
     fn test_justification_parser_exists_elim() {
         assert_eq!(
-            parse_justification(&lex("∃Elim:42,43-44").unwrap()),
+            parse_justification_text("∃Elim:42,43-44"),
             Ok(Justification::ExistsElim(42, (43, 44)))
         );
     }
     #[test]
     fn test_justification_parser_implies_elim() {
-        assert_eq!(
-            parse_justification(&lex("→Elim:42,43").unwrap()),
-            Ok(Justification::ImpliesElim(42, 43))
-        );
-        assert!((parse_justification(&lex("→Elim:42,43,").unwrap()).is_err()));
+        assert_eq!(parse_justification_text("→Elim:42,43"), Ok(Justification::ImpliesElim(42, 43)));
+        assert!((parse_justification_text("→Elim:42,43,").is_err()));
     }
 
     #[test]

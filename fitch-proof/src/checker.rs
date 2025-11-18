@@ -179,15 +179,10 @@ impl Proof {
         // check that all variables are bound, that user doesn't have nested quantifiers over the
         // same variable and that users don't quantify over a constant, and that the user does not make
         // a function with the name of a variable
-        errors.extend(self.numbered_lines().
-                      filter_map(|line| {
-                          match line.sentence() {
-                              None => None,
-                              Some(wff) =>
-                                  self.check_variable_scoping_naming_issues(wff, line.line_num)
-                                  .err()
-                          }
-                      }));
+        errors.extend(self.numbered_lines().filter_map(|line| match line.sentence() {
+            None => None,
+            Some(wff) => self.check_variable_scoping_naming_issues(wff, line.line_num).err(),
+        }));
 
         // check that user does not use a symbol to denote both a constant and a function, and that
         // arities of function symbols are consistent throughout the proof.
@@ -312,11 +307,7 @@ impl Proof {
                     let bc = line.boxed_constant_owned().expect(
                         "Internal error: introduces_boxed_constant returned true but boxed_constant missing",
                     );
-                    if currently_in_scope
-                        .iter()
-                        .filter_map(|opt| opt.as_ref())
-                        .any(|t| *t == bc)
-                    {
+                    if currently_in_scope.iter().filter_map(|opt| opt.as_ref()).any(|t| *t == bc) {
                         errors.push(format!("Line {}: you cannot introduce the same boxed constant twice in nested subproofs", line.line_num));
                     }
                     currently_in_scope.push(Some(bc));
@@ -771,9 +762,9 @@ impl Proof {
         }
         let just = line.justification().unwrap();
 
-        // if there is no Wff then we should also skip 
+        // if there is no Wff then we should also skip
         if line.sentence().is_none() {
-            return Err(format!("Line: {curr_line_num}: no formula present"))
+            return Err(format!("Line: {curr_line_num}: no formula present"));
         }
         let curr_wff = line.sentence().unwrap();
 
@@ -934,7 +925,8 @@ impl Proof {
                     ));
                 };
                 let (s_begin, s_end) = self.get_subproof_at_lines(curr_line_num, (*n, *m))?;
-                if let (Some(s_begin_wff), Some(s_end_wff), None) = (s_begin.sentence(), s_end.sentence(), s_begin.boxed_constant())
+                if let (Some(s_begin_wff), Some(s_end_wff), None) =
+                    (s_begin.sentence(), s_end.sentence(), s_begin.boxed_constant())
                 {
                     if a.value() != s_begin_wff && b.value() == s_end_wff {
                         Err(format!(
@@ -996,14 +988,13 @@ impl Proof {
                         Some(s_end_wff1),
                         Some(s_begin_wff2),
                         Some(s_end_wff2),
-                        false
+                        false,
                     ) = (
                         s_begin1.sentence(),
                         s_end1.sentence(),
                         s_begin2.sentence(),
                         s_end2.sentence(),
-                        s_begin1.boxed_constant().is_some()
-                            || s_begin2.boxed_constant().is_some()
+                        s_begin1.boxed_constant().is_some() || s_begin2.boxed_constant().is_some(),
                     ) {
                         if p.value() == s_begin_wff1
                             && q.value() == s_end_wff1
@@ -1027,7 +1018,8 @@ impl Proof {
                     let left_wff = wff1.value();
                     let right_wff = wff2.value();
                     if (wff_m == left_wff && right_wff == curr_wff) // eliminating using the LHS, getting the RHS
-                        || (wff_m == right_wff && left_wff == curr_wff) // the opposite
+                        || (wff_m == right_wff && left_wff == curr_wff)
+                    // the opposite
                     {
                         Ok(())
                     } else {
@@ -1176,7 +1168,6 @@ impl Proof {
                     return Err(format!("Line {curr_line_num}: the rule ∀Elim:{sb}-{se} is used, but line {se} does not contain a sentence"));
                 };
 
-
                 if apply_trivial_substitution_everywhere_to_wff(
                     forall_curr_wff,
                     (&Term::Atomic(var.to_string()), boxed_const),
@@ -1188,7 +1179,9 @@ impl Proof {
                 Ok(())
             }
             Justification::ForallElim(n) => {
-                let Wff::Forall(var, forall_ref_wff_box) = self.get_wff_at_line(curr_line_num, *n)? else {
+                let Wff::Forall(var, forall_ref_wff_box) =
+                    self.get_wff_at_line(curr_line_num, *n)?
+                else {
                     return Err(format!(
                         "Line {curr_line_num}: the justification \
                         ∀Elim:{n} is used, but the sentence at line {n} is not a \
@@ -1200,8 +1193,10 @@ impl Proof {
                     find_possible_trivial_substitution_wff(forall_ref_wff, curr_wff)
                 {
                     // if `find_possible_triviabl_substitution_wff` returns something we always need to double check
-                    if apply_trivial_substitution_everywhere_to_wff(forall_ref_wff, (&term1, &term2))
-                        == *curr_wff
+                    if apply_trivial_substitution_everywhere_to_wff(
+                        forall_ref_wff,
+                        (&term1, &term2),
+                    ) == *curr_wff
                         && Term::Atomic(var.to_string()) == term1
                     {
                         return if self.is_closed_term(&term2) {
@@ -1294,7 +1289,7 @@ impl Proof {
                 if apply_trivial_substitution_everywhere_to_wff(
                     exists_ref_wff,
                     (&Term::Atomic(var.to_string()), bc_term),
-                   ) == *sent_begin
+                ) == *sent_begin
                 {
                     if sent_end == curr_wff {
                         Ok(())

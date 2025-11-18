@@ -1,3 +1,4 @@
+use std::fmt;
 use std::hash::{Hash, Hasher};
 
 /// Location metadata for syntactic elements originating from parsed input.
@@ -26,8 +27,18 @@ impl Location {
     }
 }
 
+impl fmt::Display for Location {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if let Some(file) = &self.file {
+            write!(f, "{}:{}:{}", file, self.line, self.column)
+        } else {
+            write!(f, "{}:{}", self.line, self.column)
+        }
+    }
+}
+
 /// A value paired with location metadata.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub struct WithLoc<T> {
     pub value: T,
     pub location: Location,
@@ -86,6 +97,14 @@ impl<T> WithLoc<T> {
     }
 }
 
+impl<T: PartialEq> PartialEq for WithLoc<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.value == other.value
+    }
+}
+
+impl<T: Eq> Eq for WithLoc<T> {}
+
 impl<T: Default> Default for WithLoc<T> {
     fn default() -> Self {
         Self::dummy(T::default())
@@ -95,7 +114,12 @@ impl<T: Default> Default for WithLoc<T> {
 impl<T: Hash> Hash for WithLoc<T> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.value.hash(state);
-        self.location.hash(state);
+    }
+}
+
+impl<T: fmt::Debug> fmt::Display for WithLoc<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?} @ {}", self.value, self.location)
     }
 }
 
@@ -113,4 +137,3 @@ impl<T> std::ops::DerefMut for WithLoc<T> {
         &mut self.value
     }
 }
-

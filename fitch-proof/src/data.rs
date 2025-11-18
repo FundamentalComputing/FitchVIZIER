@@ -6,30 +6,32 @@ pub type LTerm = WithLoc<Term>;
 pub type LJustification = WithLoc<Justification>;
 
 // Temp code for plugging in type errors
-pub fn wrap_nodes_with_dummy_locations(nodes: Vec<ProofNode>) -> Vec<LProofNode> {
-    nodes.into_iter().map(WithLoc::dummy).collect()
-}
-
+#[allow(dead_code)]
 pub fn dummy_lwff(wff: Wff) -> LWff {
     WithLoc::dummy(wff)
 }
 
+#[allow(dead_code)]
 pub fn dummy_lterm(term: Term) -> LTerm {
     WithLoc::dummy(term)
 }
 
+#[allow(dead_code)]
 pub fn dummy_ljustification(just: Justification) -> LJustification {
     WithLoc::dummy(just)
 }
 
+#[allow(dead_code)]
 pub fn boxed_lwff(wff: Wff) -> Box<LWff> {
     Box::new(dummy_lwff(wff))
 }
 
+#[allow(dead_code)]
 pub fn vec_lwff(wffs: Vec<Wff>) -> Vec<LWff> {
     wffs.into_iter().map(dummy_lwff).collect()
 }
 
+#[allow(dead_code)]
 pub fn vec_lterm(terms: Vec<Term>) -> Vec<LTerm> {
     terms.into_iter().map(dummy_lterm).collect()
 }
