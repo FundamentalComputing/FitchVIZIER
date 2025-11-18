@@ -91,6 +91,9 @@ impl ProofNode {
         }
     }
 
+    pub fn line_num(&self) -> Option<usize> {
+        return self.as_numbered().map(|s| s.line_num);
+    }
     pub fn is_fitch_bar(&self) -> bool {
         matches!(self, ProofNode::FitchBar { .. })
     }

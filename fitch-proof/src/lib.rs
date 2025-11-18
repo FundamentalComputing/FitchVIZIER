@@ -12,6 +12,7 @@ use crate::data::{ProofResult, Wff};
 pub use crate::data::{Justification, NumberedLine, ProofNode};
 pub use crate::loc::{Location, WithLoc};
 pub use parser::parse_fitch_proof;
+pub use parser::parse_logical_expression_string;
 
 macro_rules! default_variable_names {
     () => {
@@ -152,5 +153,18 @@ pub fn export_to_latex(proof: &str) -> String {
         Ok(nodes) if !nodes.is_empty() => export_to_latex::proof_to_latex(&nodes),
         _ => "Failed to export to latex, because the proof could not be parsed or was empty."
             .to_string(),
+    }
+}
+
+/// Produce a debug-friendly string that includes locations for every proof node and its contents.
+pub fn debug_proof_with_locations(proof: &str) -> String {
+    match parser::parse_fitch_proof(proof) {
+        Ok(nodes) => nodes
+            .iter()
+            .enumerate()
+            .map(|(idx, node)| format!("{}: {:#?}", idx + 1, node))
+            .collect::<Vec<_>>()
+            .join("\n"),
+        Err(err) => format!("Parse error: {err}"),
     }
 }

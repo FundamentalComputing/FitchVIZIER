@@ -14,7 +14,10 @@ struct Args {
     no_template: bool,
 
     #[arg(long, action)]
-    summary: bool
+    summary: bool,
+
+    #[arg(long, action)]
+    debug: bool,
 }
 
 
@@ -32,9 +35,10 @@ fn main() {
 
     let no_template = args.no_template;
     let summary = args.summary;
+    let debug = args.debug;
 
     for proof_file in &args.path {
-        check_file(no_template, proof_file)
+        check_file(no_template, debug, proof_file)
     }
     
     if summary {
@@ -43,7 +47,7 @@ fn main() {
 
 }
 
-fn check_file(no_template : bool, proof_file : &String) {
+fn check_file(no_template : bool, debug: bool, proof_file : &String) {
     let variables = DEFAULT_ALLOWED_VARIABLE_NAMES.to_string();
 
     let Ok(proof) = std::fs::read_to_string(proof_file) else {
@@ -64,5 +68,8 @@ fn check_file(no_template : bool, proof_file : &String) {
         fitch_proof::check_proof_with_template(&proof, template, &variables)
     };
     println!("{}", result);
+    if debug {
+        println!("\nDebug proof with locations:\n{}", fitch_proof::debug_proof_with_locations(&proof));
+    }
 
 }

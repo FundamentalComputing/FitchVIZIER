@@ -1,6 +1,7 @@
 use std::collections::HashSet;
 use std::iter;
 use std::iter::from_fn;
+
 use crate::data::*;
 use crate::loc::{Location, WithLoc};
 
@@ -8,7 +9,7 @@ type LToken = WithLoc<Token>;
 
 /// This function takes a string slice and tries to parse it as a full proof.
 ///
-/// If it succeeds, a vector of [ProofNode]s is returned. If it does not succeed, then a nice error
+/// If it succeeds, a vector of [LProofNode]s is returned. If it does not succeed, then a nice error
 /// message is returned.
 ///
 /// For a specification of the grammar that is used for parsing, see the documentation of the
@@ -25,9 +26,8 @@ pub fn parse_fitch_proof(proof: &str) -> Result<Vec<LProofNode>, String> {
             Some(match lex_with_line(line, Some(idx + 1)) {
                 Ok(toks) => match parse_proof_line(&toks) {
                     Ok(node) => {
-                        if let Some(numbered) = node.value().as_numbered() {
-                            last_line_num = numbered.line_num;
-                        }
+                        last_line_num = node.line_num()
+                            .unwrap_or(last_line_num);
                         Ok(node)
                     }
                     Err(err) => Err(format!("parser failure near line {}: {}", last_line_num + 1, err)),
@@ -55,9 +55,12 @@ pub fn parse_allowed_variable_names(allowed_var_names: &str) -> Result<HashSet<S
         }
     };
     let err_str = "the list of allowed variable names could not be parsed".to_string();
+
+    // additional check, does not hurt
     if toks.iter().any(|tok| !matches!(tok.value(), Token::Name(_) | Token::Comma)) {
         return Err(err_str);
     }
+
     let mut allowed_variable_names: HashSet<String> = HashSet::from([]);
     let mut rem_toks = toks.as_slice();
 
@@ -69,10 +72,10 @@ pub fn parse_allowed_variable_names(allowed_var_names: &str) -> Result<HashSet<S
             return Err(err_str);
         };
         if !var_name.chars().next().unwrap().is_ascii_lowercase() {
-            return Err("the list of allowed variable names could not be parsed: a variable name must start with a lowercase letter".to_string());
+            return Err(format!("the list of allowed variable names could not be parsed: a variable name must start with a lowercase letter: {}", var_name));
         }
         if allowed_variable_names.contains(var_name) {
-            return Err("the list of allowed variable names contains duplicates".to_string());
+            return Err(format!("the list of allowed variable names contains duplicates: {}", var_name));
         }
         allowed_variable_names.insert(var_name.to_string());
         if rem_toks.len() == 1 {
@@ -125,13 +128,9 @@ pub fn parse_allowed_variable_names(allowed_var_names: &str) -> Result<HashSet<S
 /// <AtomicPropositionName> : some string starting with an UPPERCASE letter
 /// ```
 pub fn parse_logical_expression_string(expr: &str) -> Option<LWff> {
-    if let Ok(toks) = lex(expr) {
-        return match parse_logical_expr(&toks) {
-            Ok(expr) => Some(expr),
-            _ => None,
-        };
-    }
-    None
+    lex(expr)
+        .and_then(|toks| parse_logical_expr(&toks))
+        .ok()
 }
 
 /* ----------------- PRIVATE -------------------*/
@@ -170,62 +169,64 @@ fn lex_with_line(input: &str, line_number: Option<usize>) -> Result<Vec<LToken>,
     let mut toks: Vec<LToken> = Vec::new();
     let mut input_iter = input.chars().peekable();
     let line = line_number.unwrap_or(1);
-    let mut column = 0usize;
+    let mut pos = Location::new(None, line, 0);
 
     while let Some(ch) = input_iter.next() {
-        column += 1;
+        pos.next_column();
         match ch {
             ' ' | '\t' => {} // ignore spaces
-            '(' => toks.push(WithLoc::new(Token::LPar, Location::new(None, line, column))),
-            ')' => toks.push(WithLoc::new(Token::RPar, Location::new(None, line, column))),
-            '\u{2200}' => toks.push(WithLoc::new(Token::Forall, Location::new(None, line, column))),
-            '\u{2203}' => toks.push(WithLoc::new(Token::Exists, Location::new(None, line, column))),
-            '\u{2227}' => toks.push(WithLoc::new(Token::And, Location::new(None, line, column))),
-            '\u{2228}' => toks.push(WithLoc::new(Token::Or, Location::new(None, line, column))),
-            '\u{2192}' => toks.push(WithLoc::new(Token::Implies, Location::new(None, line, column))),
-            '\u{2194}' => toks.push(WithLoc::new(Token::Bicond, Location::new(None, line, column))),
-            '\u{00AC}' => toks.push(WithLoc::new(Token::Not, Location::new(None, line, column))),
-            ',' => toks.push(WithLoc::new(Token::Comma, Location::new(None, line, column))),
-            '=' => toks.push(WithLoc::new(Token::Equals, Location::new(None, line, column))),
+            '(' => toks.push(WithLoc::new(Token::LPar, pos.clone())),
+            ')' => toks.push(WithLoc::new(Token::RPar, pos.clone())),
+            '\u{2200}' => toks.push(WithLoc::new(Token::Forall, pos.clone())),
+            '\u{2203}' => toks.push(WithLoc::new(Token::Exists, pos.clone())),
+            '\u{2227}' => toks.push(WithLoc::new(Token::And, pos.clone())),
+            '\u{2228}' => toks.push(WithLoc::new(Token::Or, pos.clone())),
+            '\u{2192}' => toks.push(WithLoc::new(Token::Implies, pos.clone())),
+            '\u{2194}' => toks.push(WithLoc::new(Token::Bicond, pos.clone())),
+            '\u{00AC}' => toks.push(WithLoc::new(Token::Not, pos.clone())),
+            ',' => toks.push(WithLoc::new(Token::Comma, pos.clone())),
+            '=' => toks.push(WithLoc::new(Token::Equals, pos.clone())),
+            //a variable name begins with a letter and contains only other letters
+            //TODO: consider using c.is_ascii_alphanumeric())
             'a'..='z' | 'A'..='Z' => {
-                let name = iter::once(ch)
+                let name = iter::once(ch) // push back the read char
                     .chain(from_fn(|| input_iter.by_ref().next_if(|c| c.is_ascii_alphabetic())))
                     .collect::<String>();
-                let loc_col = column;
-                column += name.len() - 1;
-                toks.push(WithLoc::new(Token::Name(name), Location::new(None, line, loc_col)));
+                let loc = pos.clone();
+                pos.advance_by(name.len() - 1); // advance the position information
+                toks.push(WithLoc::new(Token::Name(name), loc));
             }
             '1'..='9' => {
                 let num_str = iter::once(ch)
                     .chain(from_fn(|| input_iter.by_ref().next_if(|c| c.is_ascii_digit())))
                     .collect::<String>();
                 let err = "there was an integer bigger than 999999999".to_string();
-                let loc_col = column;
-                column += num_str.len() - 1;
+                let loc = pos.clone();
+                pos.advance_by(num_str.len() - 1);
                 match num_str.parse::<usize>() {
                     Ok(n) if n <= 999_999_999 => {
-                        toks.push(WithLoc::new(Token::Number(n), Location::new(None, line, loc_col)))
+                        toks.push(WithLoc::new(Token::Number(n), loc))
                     }
                     _ => return Err(err),
                 }
             }
             '|' => {
-                let bars: String = iter::once(ch)
+                let full_bar_str: String = iter::once(ch)
                     .chain(from_fn(|| input_iter.by_ref().next_if(|c| *c == '|' || *c == ' ')))
                     .collect();
-                let count = bars.chars().filter(|c| *c == '|').count();
-                let loc_col = column;
-                column += bars.len() - 1;
-                toks.push(WithLoc::new(
-                    Token::ConseqVertBar(count),
-                    Location::new(None, line, loc_col),
-                ));
+                // how many bares we actually have
+                let count =
+                    full_bar_str.chars().filter(|c| *c == '|').count();
+                let loc = pos.clone();
+                pos.advance_by(full_bar_str.len() - 1);
+
+                toks.push(WithLoc::new(Token::ConseqVertBar(count), loc));
             }
-            ':' => toks.push(WithLoc::new(Token::Colon, Location::new(None, line, column))),
-            '-' => toks.push(WithLoc::new(Token::Dash, Location::new(None, line, column))),
-            '[' => toks.push(WithLoc::new(Token::LSqBracket, Location::new(None, line, column))),
-            ']' => toks.push(WithLoc::new(Token::RSqBracket, Location::new(None, line, column))),
-            '⊥' => toks.push(WithLoc::new(Token::Bottom, Location::new(None, line, column))),
+            ':' => toks.push(WithLoc::new(Token::Colon, pos.clone())),
+            '-' => toks.push(WithLoc::new(Token::Dash, pos.clone())),
+            '[' => toks.push(WithLoc::new(Token::LSqBracket, pos.clone())),
+            ']' => toks.push(WithLoc::new(Token::RSqBracket, pos.clone())),
+            '⊥' => toks.push(WithLoc::new(Token::Bottom, pos.clone())),
             _ => {
                 let mut err: String = "invalid character found: ".to_owned();
                 err.push(ch);
@@ -244,14 +245,19 @@ fn lex_with_line(input: &str, line_number: Option<usize>) -> Result<Vec<LToken>,
 /// The grammar: see documentation of [parser::parse_logical_expression_string].
 ///
 fn parse_logical_expr(toks: &[LToken]) -> Result<LWff, String> {
+    if toks.is_empty() {
+        return Err("parse_logical_expression: no tokens to parse".to_string())
+    }
+    let loc = toks.first().unwrap().location();
     if let Some((wff, rem_toks)) = parse_e1(toks) {
+        // check that there are no remaining tokens left
         if rem_toks.is_empty() {
             return Ok(wff);
         } else {
-            return Err("failed to parse logical expression".to_string());
+            return Err(format!("failed to parse logical expression near {}", loc));
         }
     }
-    Err("failed to parse logical expression".to_string())
+    Err(format!("failed to parse logical expression near {}", loc))
 }
 
 /// Parse an `<E1>` as defined by the grammar specified in the documentation of [parse_logical_expr].

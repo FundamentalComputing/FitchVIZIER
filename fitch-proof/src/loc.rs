@@ -25,6 +25,19 @@ impl Location {
             column: 0,
         }
     }
+
+    pub fn next_line(&mut self) {
+        self.line += 1;
+        self.column = 0;
+    }
+
+    pub fn next_column(&mut self) {
+        self.column += 1;
+    }
+
+    pub fn advance_by(&mut self, n: usize) {
+        self.column += n;
+    }
 }
 
 impl fmt::Display for Location {
