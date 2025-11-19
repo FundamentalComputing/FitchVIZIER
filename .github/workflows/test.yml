@@ -10,10 +10,17 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build:
+  test:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
+    - uses: pnpm/action-setup@v4
+      with:
+        version: 10
+    - name: Run Linter
+      working-directory: ./webui/app
+      run: pnpm install && pnpm lint
+
     - name: Run unit tests
       run: cargo test --verbose --manifest-path fitch-proof/Cargo.toml
     - name: Run integration tests
