@@ -4,6 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+clap = { version = "4.5.51", features = ["derive"] }
+comfy-table = "7.2.1"
 fitch-proof = { path = "../fitch-proof" }
 
 [profile.release]

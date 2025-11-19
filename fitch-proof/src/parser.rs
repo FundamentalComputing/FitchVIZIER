@@ -6,21 +6,23 @@ use crate::data::*;
 
 /// This function takes a string slice and tries to parse it as a full proof.
 ///
-/// If it succeeds, a vector of [ProofLine]s is returned. If it does not succeed, then a nice error
+/// If it succeeds, a vector of [ProofNode]s is returned. If it does not succeed, then a nice error
 /// message is returned.
 ///
 /// For a specification of the grammar that is used for parsing, see the documentation of the
 /// functions [parse_proof_line] and [parse_logical_expr].
-pub fn parse_fitch_proof(proof: &str) -> Result<Vec<ProofLine>, String> {
+pub fn parse_fitch_proof(proof: &str) -> Result<Vec<ProofNode>, String> {
     let mut last_line_num = 0;
     proof
         .lines()
         .filter(|s| !s.is_empty())
         .map(|x| match lex(x) {
             Ok(toks) => match parse_proof_line(&toks) {
-                Ok(line) => {
-                    last_line_num = line.line_num.unwrap_or(last_line_num);
-                    Ok(line)
+                Ok(node) => {
+                    if let Some(numbered) = node.as_numbered() {
+                        last_line_num = numbered.line_num;
+                    }
+                    Ok(node)
                 }
                 Err(err) => Err(format!("parser failure near line {}: {}", last_line_num + 1, err)),
             },
@@ -73,7 +75,6 @@ pub fn parse_allowed_variable_names(allowed_var_names: &str) -> Result<HashSet<S
     }
     Ok(allowed_variable_names)
 }
-
 
 /// This function parses a *logical expression* from a String.
 ///
@@ -449,7 +450,7 @@ fn parse_arg_list(toks: &[Token]) -> Option<(Vec<Term>, &[Token])> {
 /// justification first (=Intro is the only justification without colon). For the rest, everything
 /// can just be done normally from left to right.
 
-fn parse_proof_line(toks: &[Token]) -> Result<ProofLine, String> {
+fn parse_proof_line(toks: &[Token]) -> Result<ProofNode, String> {
     if toks.contains(&Token::Colon)
         || (toks.last() == Some(&Token::Name("Intro".to_string())) // special check for =Intro
             && toks.get(toks.len() - 2) == Some(&Token::Equals))
@@ -491,14 +492,13 @@ fn parse_proof_line(toks: &[Token]) -> Result<ProofLine, String> {
                 parse_justification(toks_justification)?,
                 parse_logical_expr(toks_before_justification.get(2..).unwrap_or(&[]))?,
             ) {
-                Ok(ProofLine {
-                    line_num: Some(*line_num),
+                Ok(ProofNode::Numbered(NumberedLine {
+                    line_num: *line_num,
                     depth: *depth,
-                    is_fitch_bar_line: false,
                     sentence: Some(wff),
                     justification: Some(justific),
-                    constant_between_square_brackets: None,
-                })
+                    boxed_constant: None,
+                }))
             } else {
                 Err("a line with an inference should always start with a line number (integer), followed by at least one vertical bar.".to_string())
             }
@@ -534,14 +534,13 @@ fn parse_proof_line(toks: &[Token]) -> Result<ProofLine, String> {
                     if toks.len() == 5 {
                         // this premise contains only a boxed constant, no further expression:
                         // early exit
-                        return Ok(ProofLine {
-                            line_num: Some(*num),
+                        return Ok(ProofNode::Numbered(NumberedLine {
+                            line_num: *num,
                             depth: *depth,
-                            is_fitch_bar_line: false,
                             sentence: None,
                             justification: None,
-                            constant_between_square_brackets: const_betw_sqbr,
-                        });
+                            boxed_constant: const_betw_sqbr,
+                        }));
                     }
                     5
                 } else {
@@ -560,26 +559,25 @@ fn parse_proof_line(toks: &[Token]) -> Result<ProofLine, String> {
 
                 let wff = parse_logical_expr(toks.get(expression_start_index..).unwrap_or(&[]))?;
 
-                Ok(ProofLine {
-                    line_num: Some(*num),
+                Ok(ProofNode::Numbered(NumberedLine {
+                    line_num: *num,
                     depth: *depth,
-                    is_fitch_bar_line: false,
                     sentence: Some(wff),
                     justification: None,
-                    constant_between_square_brackets: const_betw_sqbr,
-                })
+                    boxed_constant: const_betw_sqbr,
+                }))
             }
             Token::ConseqVertBar(depth) => {
                 if toks[1..].iter().all(|t| t == &Token::Dash) {
-                    Ok(ProofLine {
-                        line_num: None,
-                        depth: *depth,
-                        // if there is a dash, then this is a fitch bar. Otherwise it's an empty line.
-                        is_fitch_bar_line: toks[1..].contains(&Token::Dash),
-                        sentence: None,
-                        justification: None,
-                        constant_between_square_brackets: None,
-                    })
+                    if toks[1..].contains(&Token::Dash) {
+                        Ok(ProofNode::FitchBar {
+                            depth: *depth,
+                        })
+                    } else {
+                        Ok(ProofNode::Empty {
+                            depth: *depth,
+                        })
+                    }
                 } else {
                     Err("when you have a line without line number, then that line can only possibly contain some minuses to indicate a Fitch bar, but it may contain no other tokens than minuses after the vertical bar(s)".to_string())
                 }

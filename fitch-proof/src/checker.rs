@@ -5,7 +5,7 @@ use crate::util;
 use std::collections::{HashMap, HashSet};
 use std::iter::zip;
 
-/// This function checks whether a proof is fully correct. It takes in a vector of [ProofLine]s,
+/// This function checks whether a proof is fully correct. It takes in a vector of [ProofNode]s,
 /// which can come straight from the parser (i.e. there are no preconditions about well-formedness
 /// of this vector).
 ///
@@ -14,17 +14,17 @@ use std::iter::zip;
 /// but something like ∀a P(a) will not be accepted, because "a" is not listed as a string
 /// that should be seen as a variable.
 pub fn check_proof(
-    proof_lines: Vec<ProofLine>,
+    proof_nodes: Vec<ProofNode>,
     allowed_variable_names: HashSet<String>,
 ) -> ProofResult {
-    match Proof::construct(proof_lines, allowed_variable_names) {
+    match Proof::construct(proof_nodes, allowed_variable_names) {
         Err(err) => ProofResult::FatalError(err),
         Ok(proof) => proof.is_fully_correct(),
     }
 }
 
 /// This function checks whether a proof is fully correct, AND that it matches a given proof
-/// template. It takes in a vector of [ProofLine]s,
+/// template. It takes in a vector of [ProofNode]s,
 /// which can come straight from the parser (i.e. there are no preconditions about well-formedness
 /// of this vector).
 ///
@@ -37,11 +37,11 @@ pub fn check_proof(
 /// but something like ∀a P(a) will not be accepted, because "a" is not listed as a string
 /// that should be seen as a variable.
 pub fn check_proof_with_template(
-    proof_lines: Vec<ProofLine>,
+    proof_nodes: Vec<ProofNode>,
     template: Vec<Wff>,
     allowed_variable_names: HashSet<String>,
 ) -> ProofResult {
-    match Proof::construct(proof_lines, allowed_variable_names) {
+    match Proof::construct(proof_nodes, allowed_variable_names) {
         Err(err) => ProofResult::FatalError(err),
         Ok(proof) => proof.is_fully_correct_and_matches_template(template),
     }
@@ -70,10 +70,13 @@ impl Proof {
         // check premises
         {
             let premises_in_proof: Vec<Wff> = self
-                .lines
+                .nodes
                 .iter()
-                .take_while(|l| !l.is_fitch_bar_line)
-                .filter_map(|l| l.sentence.clone())
+                .take_while(|node| !node.is_fitch_bar())
+                .filter_map(|node| match node {
+                    ProofNode::Numbered(line) => line.sentence.clone(),
+                    _ => None,
+                })
                 .collect();
 
             // index is within bounds
@@ -87,7 +90,10 @@ impl Proof {
 
         // check conclusion
         {
-            let conclusion_in_proof = self.lines.iter().rev().find(|l| l.sentence.is_some());
+            let conclusion_in_proof = self.nodes.iter().rev().find_map(|node| match node {
+                ProofNode::Numbered(line) => line.sentence.as_ref(),
+                _ => None,
+            });
             match conclusion_in_proof {
                 None => {
                     template_errors
@@ -95,7 +101,7 @@ impl Proof {
                 }
                 Some(concl) => {
                     // both unwraps work (note that we checked the length of `template`)
-                    if concl.sentence.as_ref().unwrap() != template.last().unwrap() {
+                    if concl != template.last().unwrap() {
                         template_errors.push("The conclusion of your proof does not match the conclusion in the proof template.".to_owned());
                     }
                 }
@@ -130,21 +136,33 @@ impl Proof {
         let mut errors: Vec<String> = vec![]; // here we accumulate all errors
 
         // check that user applied proof rule correctly everywhere
-        for line in &self.lines {
+        for line in self.numbered_lines() {
             if let Err(err) = self.check_line(line) {
                 errors.push(err.to_string());
             }
         }
 
         // check that proof starts with zero or more premises, followed by a Fitch bar
-        if !self.units.iter().any(|u| *u == ProofUnit::FitchBarLine)
-            || !self.units.iter().take_while(|u| **u != ProofUnit::FitchBarLine).all(|u| {
-                matches!(
-                    *u,
-                    ProofUnit::NumberedProofLineWithoutJustificationWithoutBoxedConstant(..)
-                )
-            })
-        {
+        let mut seen_fitch_bar = false;
+        let mut premises_ok = true;
+        for node in self.nodes() {
+            match node {
+                ProofNode::FitchBar {
+                    ..
+                } => {
+                    seen_fitch_bar = true;
+                    break;
+                }
+                ProofNode::Numbered(line) => {
+                    if line.is_inference() || line.introduces_boxed_constant() {
+                        premises_ok = false;
+                        break;
+                    }
+                }
+                _ => {}
+            }
+        }
+        if !seen_fitch_bar || !premises_ok {
             errors.push(
                 "Each proof should start start with zero or more premises, followed by a Fitch bar"
                     .to_string(),
@@ -161,19 +179,15 @@ impl Proof {
         // check that all variables are bound, that user doesn't have nested quantifiers over the
         // same variable and that users don't quantify over a constant, and that the user does not make
         // a function with the name of a variable
-        errors.extend(
-            self.lines
-                .iter()
-                .filter(|line| line.sentence.is_some())
-                .map(|line| {
-                    self.check_variable_scoping_naming_issues(
-                        line.sentence.as_ref().unwrap(),
-                        line.line_num.unwrap(),
-                    )
-                })
-                .filter(|r| r.is_err())
-                .map(|r| r.unwrap_err()),
-        );
+        errors.extend(self.numbered_lines().filter(|line| line.sentence.is_some()).filter_map(
+            |line| {
+                self.check_variable_scoping_naming_issues(
+                    line.sentence.as_ref().unwrap(),
+                    line.line_num,
+                )
+                .err()
+            },
+        ));
 
         // check that user does not use a symbol to denote both a constant and a function, and that
         // arities of function symbols are consistent throughout the proof.
@@ -206,20 +220,27 @@ impl Proof {
     fn line_numbers_missing_justification(&self) -> Vec<usize> {
         let mut res = vec![]; // store what we're going to return
         let mut expect_justification = false;
-        for i in 0..self.units.len() {
-            match self.units[i] {
-                ProofUnit::FitchBarLine => {
+        for node in self.nodes() {
+            match node {
+                ProofNode::FitchBar {
+                    ..
+                } => {
                     expect_justification = true;
                 }
-                ProofUnit::SubproofOpen => {
+                ProofNode::SubproofOpen {
+                    ..
+                } => {
                     expect_justification = false;
                 }
-                ProofUnit::SubproofClose => {}
-                ProofUnit::NumberedProofLineWithJustification(_) => {}
-                ProofUnit::NumberedProofLineWithoutJustificationWithoutBoxedConstant(num)
-                | ProofUnit::NumberedProofLineThatIntroducesBoxedConstant(num) => {
-                    if expect_justification {
-                        res.push(num);
+                ProofNode::SubproofClose {
+                    ..
+                }
+                | ProofNode::Empty {
+                    ..
+                } => {}
+                ProofNode::Numbered(line) => {
+                    if expect_justification && !line.is_inference() {
+                        res.push(line.line_num);
                     }
                 }
             }
@@ -230,23 +251,12 @@ impl Proof {
 
     /// This function returns true if and only if the last line (that has a line number) is inside a subproof
     fn last_line_is_inside_subproof(&self) -> bool {
-        // unwrap should work, since this proof is half-well-structured, so it should contain some
-        // line that contains a logical sentence or boxed constant (i.e. it has a line number).
-        self.lines.iter().rev().find(|&pl| pl.sentence.is_some()).unwrap().depth > 1
+        self.last_numbered_line().map(|line| line.depth > 1).unwrap_or(false)
     }
 
     /// This function returns the line number of the last sentence of the proof.
     fn last_line_num(&self) -> usize {
-        // unwrap should work, since this proof is half-well-structured, so it should contain some
-        // line that contains a logical sentence or boxed constant (i.e. it has a line number).
-        self.lines.iter().rev().find(|&pl| pl.line_num.is_some()).unwrap().line_num.unwrap()
-    }
-
-    /// This function gives you the [ProofLine] at line number `line_num`. It does not care about who
-    /// referenced this line, and scope issues and such, it just gives it to you. This function
-    /// panics if the line number does not exist within the proof.
-    fn get_proofline_at_line_unsafe(&self, line_num: usize) -> &ProofLine {
-        self.lines.iter().find(|x| x.line_num.is_some() && x.line_num.unwrap() == line_num).unwrap()
+        self.last_numbered_line().map(|line| line.line_num).unwrap()
     }
 
     /// This function checks that no boxed constants are used outside the subproof. If no boxed
@@ -256,24 +266,21 @@ impl Proof {
         let mut errors: Vec<String> = vec![];
 
         // step 1: check which boxed constants exist within the proof
-        let boxed_consts: HashSet<_> = self
-            .lines
-            .iter()
-            .filter_map(|line| line.constant_between_square_brackets.clone())
-            .collect();
+        let boxed_consts: HashSet<_> =
+            self.numbered_lines().filter_map(|line| line.boxed_constant.clone()).collect();
 
         // step 2: let's also give warnings if the user puts a variable in a box (not a constant)
         errors.extend(
-            self.lines
-                .iter()
-                .filter(|line| line.constant_between_square_brackets.is_some())
+            self.numbered_lines()
+                .filter(|line| line.boxed_constant.is_some())
                 .filter_map(|line| {
-                    if self.term_is_constant(
-                        line.constant_between_square_brackets.as_ref().unwrap().clone(),
-                    ) {
+                    if self.term_is_constant(line.boxed_constant.as_ref().unwrap().clone()) {
                         None
                     } else {
-                        Some(format!("Line {}: a boxed constant cannot be a variable (should not have the name of a variable).", line.line_num.unwrap()))
+                        Some(format!(
+                            "Line {}: a boxed constant cannot be a variable (should not have the name of a variable).",
+                            line.line_num
+                        ))
                     }
                 }),
         );
@@ -281,61 +288,69 @@ impl Proof {
         // step 3: iterate over proof units and see if boxed constants only get used when allowed
         // keep a stack of which boxed constants are in scope:
         let mut currently_in_scope: Vec<Option<Term>> = vec![];
-        for i in 0..self.units.len() {
-            match self.units[i] {
-                ProofUnit::FitchBarLine => {}
-                ProofUnit::NumberedProofLineThatIntroducesBoxedConstant(num) => {
-                    let new_boxed_const =
-                        &self.get_proofline_at_line_unsafe(num).constant_between_square_brackets;
-
+        for node in self.nodes() {
+            match node {
+                ProofNode::FitchBar {
+                    ..
+                } => {}
+                ProofNode::Numbered(line) if line.introduces_boxed_constant() => {
+                    let new_boxed_const = &line.boxed_constant;
                     // before we add the new variable to current scope,
-                    // test that it was not already in scope:
+                    // test if it was not already in scope:
                     if currently_in_scope.contains(new_boxed_const) {
-                        errors.push(format!("Line {num}: you cannot introduce the same boxed constant twice in nested subproofs"));
+                        errors.push(format!("Line {}: you cannot introduce the same boxed constant twice in nested subproofs", line.line_num));
                     }
-
                     currently_in_scope.push(new_boxed_const.clone());
-
-                    if let Some(wff) = &self.get_proofline_at_line_unsafe(num).sentence {
-                        match check_wff_not_contain_out_of_scope_boxed_consts(
+                    if let Some(wff) = &line.sentence {
+                        if let Err(err) = check_wff_not_contain_out_of_scope_boxed_consts(
                             wff,
                             &currently_in_scope,
                             &boxed_consts,
-                            num,
+                            line.line_num,
                         ) {
-                            Ok(_) => {}
-                            Err(err) => errors.push(err),
+                            errors.push(err);
                         }
                     }
                 }
-                ProofUnit::NumberedProofLineWithoutJustificationWithoutBoxedConstant(num) => {
+                ProofNode::Numbered(line)
+                    if !line.is_inference() && !line.introduces_boxed_constant() =>
+                {
                     currently_in_scope.push(None);
-
-                    let prfln = self.get_proofline_at_line_unsafe(num);
-                    if let Err(err) = check_wff_not_contain_out_of_scope_boxed_consts(
-                        prfln.sentence.as_ref().unwrap(),
-                        &currently_in_scope,
-                        &boxed_consts,
-                        num,
-                    ) {
-                        errors.push(err);
+                    if let Some(wff) = &line.sentence {
+                        if let Err(err) = check_wff_not_contain_out_of_scope_boxed_consts(
+                            wff,
+                            &currently_in_scope,
+                            &boxed_consts,
+                            line.line_num,
+                        ) {
+                            errors.push(err);
+                        }
                     }
                 }
-                ProofUnit::NumberedProofLineWithJustification(num) => {
-                    let prfln = self.get_proofline_at_line_unsafe(num);
-                    if let Err(err) = check_wff_not_contain_out_of_scope_boxed_consts(
-                        prfln.sentence.as_ref().unwrap(),
-                        &currently_in_scope,
-                        &boxed_consts,
-                        num,
-                    ) {
-                        errors.push(err);
+                ProofNode::Numbered(line) if line.is_inference() => {
+                    if let Some(wff) = &line.sentence {
+                        if let Err(err) = check_wff_not_contain_out_of_scope_boxed_consts(
+                            wff,
+                            &currently_in_scope,
+                            &boxed_consts,
+                            line.line_num,
+                        ) {
+                            errors.push(err);
+                        }
                     }
                 }
-                ProofUnit::SubproofClose => {
+                ProofNode::SubproofClose {
+                    ..
+                } => {
                     currently_in_scope.pop();
                 }
-                ProofUnit::SubproofOpen => {}
+                ProofNode::SubproofOpen {
+                    ..
+                }
+                | ProofNode::Empty {
+                    ..
+                } => {}
+                ProofNode::Numbered(_) => {}
             }
         }
 
@@ -629,21 +644,17 @@ impl Proof {
                 Wff::Atomic(str) => HashSet::from([(str.to_owned(), 0)]),
             }
         }
-        self.lines
-            .iter()
-            .by_ref()
+        self.numbered_lines()
             .filter_map(|line| line.sentence.as_ref())
             .flat_map(|t| get_arity_set_wff(self, t))
             .chain(
                 // also include boxed constants in arity set!
-                self.lines
-                    .iter()
-                    .by_ref()
-                    .filter_map(|line| line.constant_between_square_brackets.as_ref())
-                    .map(|c| match c {
+                self.numbered_lines().filter_map(|line| line.boxed_constant.as_ref()).map(|c| {
+                    match c {
                         Term::Atomic(str) => (str.to_owned(), 0),
                         Term::FuncApp(..) => panic!("boxed constant cannot be FuncApp"),
-                    }),
+                    }
+                }),
             )
             .collect()
     }
@@ -667,8 +678,8 @@ impl Proof {
         referencing_line: usize,
         requested_line: usize,
     ) -> Result<&Wff, String> {
-        let li = self.lines.iter().find(|l| l.line_num == Some(requested_line));
-        if let Some(l) = li {
+        let line = self.find_numbered_line(requested_line);
+        if let Some(l) = line {
             if let Some(wff) = &l.sentence {
                 if self.can_reference(referencing_line, requested_line) {
                     Ok(wff)
@@ -700,11 +711,11 @@ impl Proof {
         &self,
         referencing_line: usize,
         (subproof_begin, subproof_end): (usize, usize),
-    ) -> Result<(&ProofLine, &ProofLine), String> {
+    ) -> Result<(&NumberedLine, &NumberedLine), String> {
         if self.scope[referencing_line].1.contains(&(subproof_begin, subproof_end)) {
-            let s_begin = self.lines.iter().find(|l| l.line_num == Some(subproof_begin)).unwrap();
+            let s_begin = self.find_numbered_line(subproof_begin).unwrap();
             // the unwrap should work, since `scope` should refer only to valid line numbers
-            let s_end = self.lines.iter().find(|l| l.line_num == Some(subproof_end)).unwrap();
+            let s_end = self.find_numbered_line(subproof_end).unwrap();
             Ok((s_begin, s_end))
         } else {
             Err(format!(
@@ -723,17 +734,14 @@ impl Proof {
     /// correctly. It will also return `Ok(())` if the given line is a premise, or a Fitch bar
     /// line, or an empty line, since in those cases there is no justification to check.
     ///
-    /// Note that the provided [ProofLine] should exist in the proof!
-    fn check_line(&self, line: &ProofLine) -> Result<(), String> {
+    /// Note that the provided [NumberedLine] should exist in the proof!
+    fn check_line(&self, line: &NumberedLine) -> Result<(), String> {
         // this function only checks lines that have a justification...
         if line.justification.is_none() {
             return Ok(());
         }
 
-        let mut curr_line_num: usize = usize::MAX;
-        if let Some(line_num) = line.line_num {
-            curr_line_num = line_num;
-        }
+        let curr_line_num = line.line_num;
 
         let (curr_wff, just) =
             (line.sentence.as_ref().unwrap(), line.justification.as_ref().unwrap());
@@ -845,11 +853,9 @@ impl Proof {
                 }
                 for (disj, subprf) in zip(disjs, subproofs) {
                     let (s_begin, s_end) = self.get_subproof_at_lines(curr_line_num, *subprf)?;
-                    let (Some(s_begin_wff), Some(s_end_wff), None) = (
-                        &s_begin.sentence,
-                        &s_end.sentence,
-                        &s_begin.constant_between_square_brackets,
-                    ) else {
+                    let (Some(s_begin_wff), Some(s_end_wff), None) =
+                        (&s_begin.sentence, &s_end.sentence, &s_begin.boxed_constant)
+                    else {
                         return Err(format!(
                             "Line {curr_line_num}: when using ∨Elim, \
                             you cannot reference subproofs which \
@@ -887,7 +893,7 @@ impl Proof {
                 };
                 let (s_begin, s_end) = self.get_subproof_at_lines(curr_line_num, (*n, *m))?;
                 if let (Some(s_begin_wff), Some(s_end_wff), None) =
-                    (&s_begin.sentence, &s_end.sentence, &s_begin.constant_between_square_brackets)
+                    (&s_begin.sentence, &s_end.sentence, &s_begin.boxed_constant)
                 {
                     if **a != *s_begin_wff && **b == *s_end_wff {
                         Err(format!(
@@ -955,8 +961,8 @@ impl Proof {
                         &s_end1.sentence,
                         &s_begin2.sentence,
                         &s_end2.sentence,
-                        &s_begin1.constant_between_square_brackets,
-                        &s_begin2.constant_between_square_brackets,
+                        &s_begin1.boxed_constant,
+                        &s_begin2.boxed_constant,
                     ) {
                         if **p == *s_begin_wff1
                             && **q == *s_end_wff1
@@ -1109,9 +1115,7 @@ impl Proof {
                     ));
                 };
                 let (s_begin, s_end) = self.get_subproof_at_lines(curr_line_num, (*sb, *se))?;
-                let Some(boxed_const @ Term::Atomic(bc)) =
-                    &s_begin.constant_between_square_brackets
-                else {
+                let Some(boxed_const @ Term::Atomic(bc)) = &s_begin.boxed_constant else {
                     return Err(format!(
                         "Line {curr_line_num}: the rule ∀Intro is used, but the \
                         referenced subproof does not introduce a boxed constant"
@@ -1220,8 +1224,7 @@ impl Proof {
                     ));
                 };
 
-                let Some(bc_term @ Term::Atomic(bc)) = &s_begin.constant_between_square_brackets
-                else {
+                let Some(bc_term @ Term::Atomic(bc)) = &s_begin.boxed_constant else {
                     return Err(format!("Line {curr_line_num}: the rule ∃Elim:{n},{sb}-{se} is used, but the referenced subproof does not introduce a boxed constant in line {sb}."));
                 };
 
