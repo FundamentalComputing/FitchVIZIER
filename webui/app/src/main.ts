@@ -170,8 +170,12 @@ Alpine.effect(() => {
 });
 
 Alpine.effect(() => {
-  const current = Alpine.store("tabs").current;
-  editor.setModel(monaco.editor.getModels()[current]);
+  const tabs = Alpine.store("tabs");
+  const currentFile = tabs.files[tabs.current];
+
+  editor.setModel(
+    currentFile ? monaco.editor.getModel(currentFile.uri) : null
+  );
 });
 
 window.addEventListener('storage', () => loadFromLocalStorage(), false); // listen for changes from other tabs

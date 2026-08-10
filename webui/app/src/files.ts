@@ -2,32 +2,32 @@ import Alpine from "alpinejs";
 import * as monaco from "monaco-editor";
 import { getFile, makeUUID } from "./helpers";
 import { saveToLocalStorage } from "./persistence";
-import { editor } from "./editor";
 
 export const initContent = `1 | A
   |----
 2 | A           Reit: 1`;
 
 export function closeTab(index: number) {
-  const files = Alpine.store("tabs").files;
-  if (files.length < 2) {
+  const tabs = Alpine.store("tabs");
+  const files = tabs.files;
+  if (files.length < 2 || index < 0 || index >= files.length) {
     return;
   }
-  const removedFile = files[index];
-  const current = Alpine.store("tabs").current;
-  files.splice(index, 1);
-  Alpine.store("tabs").current = current > index ? current - 1 : Math.min(current, files.length - 1);
 
-  setTimeout(() => { // it errors without this and im too tired to fix it properly
-    const stillOpen = files.some(file => file.uri.toString() == removedFile.uri.toString());
-    if (!stillOpen) {
-      monaco.editor.getModel(removedFile.uri)?.dispose();
-    }
-    const currentFile = files[Alpine.store("tabs").current];
-    if (currentFile) {
-      editor.setModel(monaco.editor.getModel(currentFile.uri));
-    }
-  }, 100);
+  const [removedFile] = files.splice(index, 1);
+
+  if (tabs.current > index) {
+    tabs.current--;
+  } else if (tabs.current === index) {
+    tabs.current = Math.min(index, files.length - 1);
+  }
+
+  const stillOpen = files.some(
+    file => file.uri.toString() === removedFile.uri.toString()
+  );
+  if (!stillOpen) {
+    monaco.editor.getModel(removedFile.uri)?.dispose();
+  }
 }
 
 export function renameTab(index: number) {
