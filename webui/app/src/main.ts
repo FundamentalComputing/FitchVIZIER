@@ -1,6 +1,5 @@
 // @ts-ignore
 import "@fontsource-variable/fira-code";
-import "./style.css";
 import {
   export_to_latex,
 } from "@workspace/library";
