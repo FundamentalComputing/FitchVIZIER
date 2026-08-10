@@ -5,6 +5,7 @@ import {
   export_to_latex,
 } from "@workspace/library";
 import * as monaco from "monaco-editor";
+import EditorWorker from "monaco-editor/esm/vs/editor/editor.worker?worker";
 import examples from "./examples.ts";
 import excercises from "./excercises.ts";
 
@@ -15,6 +16,16 @@ import { initStores } from "./stores.ts";
 import { loadFromLocalStorage, saveToLocalStorage } from "./persistence.ts";
 import { closeTab, initContent, newFile, openFile, renameTab } from "./files.ts";
 import { editor, fix_line_numbers, format, initEditor, process_user_input } from "./editor.ts";
+
+const monacoGlobal = globalThis as typeof globalThis & {
+  MonacoEnvironment: {
+    getWorker: (workerId: string, label: string) => Worker;
+  };
+};
+
+monacoGlobal.MonacoEnvironment = {
+  getWorker: () => new EditorWorker(),
+};
 
 initStores();
 
