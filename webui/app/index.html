@@ -40,8 +40,9 @@
       <div style="position: relative;" class="relative border-x-1 border-gray-300 dark:border-gray-700">
         <div id="editor"></div>
         <div class="absolute bottom-0 flex flex-wrap justify-between w-full px-4 pb-2 text-lg" x-data>
-          <div class="flex-grow text-nowrap pr-4"><span>🏁 </span><input type="text" class="flex-grow w-full"
-              placeholder="What do you want to prove?" id='proof_target'
+          <div class="flex-grow text-nowrap pr-4" x-show="$store.tabs.files[$store.tabs.current].proofTarget">
+            <span>🏁 Exercise target: </span><input type="text" class="flex-grow w-full"
+              placeholder="What do you want to prove?" id="proof_target"
               x-model="$store.tabs.files[$store.tabs.current].proofTarget">
           </div>
           <div id="typing-guide2" class="">
@@ -73,7 +74,7 @@
         title="Fix the line numbers in a proof, and automatically update justifications. For example, suppose you want to delete a line in the middle of your proof. In that case, you can just delete that line and press this button afterwards, which will fix up the line numbers. If you want to insert a line in the middle of your proof, just initially give it a line number of 100 or so, and click this button afterwards.">FIX
         LINE NUMBERS</button>
       <button id="load-example-button" title="Load example proofs">EXAMPLES</button>
-      <button id="load-excercise-button" title="Load randm excercise">RANDOM EXCERCISE</button>
+      <button id="load-exercise-button" title="Load random exercise">RANDOM EXERCISE</button>
       <button id="settings-button" title="Toggle visibility of advanced settings">ADVANCED SETTINGS</button>
     </div>
     <div id="additional-examples" hidden

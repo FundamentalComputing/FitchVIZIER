@@ -6,7 +6,7 @@ import {
 import * as monaco from "monaco-editor";
 import EditorWorker from "monaco-editor/esm/vs/editor/editor.worker?worker";
 import examples from "./examples.ts";
-import excercises from "./excercises.ts";
+import exercises from "./exercises.ts";
 
 import Alpine from 'alpinejs';
 import { languagedef, theme, lightTheme } from "./languagedef.ts";
@@ -30,7 +30,6 @@ initStores();
 
 declare global {
   interface Window {
-    editor: monaco.editor.IStandaloneCodeEditor;
     load_example: (index: number) => void;
     closeTab: (index: number) => void;
     renameTab: (index: number) => void;
@@ -39,7 +38,6 @@ declare global {
 }
 
 window.Alpine = Alpine;
-window.editor = editor;
 window.closeTab = closeTab;
 window.renameTab = renameTab;
 
@@ -69,16 +67,16 @@ window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (ev
 initEditor();
 editor.setModel(initModel);
 
-function load_random_excercise() {
-  const excercise = excercises[(Math.random() * excercises.length) | 0];
+function load_random_exercise() {
+  const exercise = exercises[(Math.random() * exercises.length) | 0];
 
   let assumptionsCompiled = "";
-  for (let i = 0; i < excercise.assumptions.length; i++) {
-    assumptionsCompiled += `${i + 1} | ${excercise.assumptions[i]}\n`;
+  for (let i = 0; i < exercise.assumptions.length; i++) {
+    assumptionsCompiled += `${i + 1} | ${exercise.assumptions[i]}\n`;
   }
   assumptionsCompiled += "  |----";
   newFile(assumptionsCompiled);
-  Alpine.store("tabs").files[Alpine.store("tabs").current].proofTarget = excercise.conclusion;
+  Alpine.store("tabs").files[Alpine.store("tabs").current].proofTarget = exercise.conclusion;
 }
 
 // Download proof as .txt file
@@ -147,7 +145,7 @@ editor.onDidChangeModel(() => editor.getModel() && process_user_input());
 document.getElementById("format-button").onclick = format;
 document.getElementById("latex-button").onclick = to_latex;
 document.getElementById("load-example-button").onclick = show_examples;
-document.getElementById("load-excercise-button").onclick = load_random_excercise;
+document.getElementById("load-exercise-button").onclick = load_random_exercise;
 document.getElementById("download-button").onclick = download_proof;
 document.getElementById("upside-down-button").onclick = upside_down;
 document.getElementById("fix-line-numbers-button").onclick = fix_line_numbers;
@@ -197,7 +195,5 @@ Alpine.effect(() => {
 
 window.addEventListener('storage', () => loadFromLocalStorage(), false); // listen for changes from other tabs
 loadFromLocalStorage();
-const current = Alpine.store("tabs").current;
-editor.setModel(monaco.editor.getModels()[current]);
 
 process_user_input();

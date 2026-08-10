@@ -14,12 +14,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
-    - uses: pnpm/action-setup@v4
+    - uses: pnpm/setup@v1
       with:
-        version: 10
+        version: 11
+        package-json-file: webui/package.json
+        install: false
     - name: Run Linter
-      working-directory: ./webui/app
-      run: pnpm install && pnpm lint
+      working-directory: ./webui
+      run: pnpm install --frozen-lockfile && pnpm --filter app lint
 
     - name: Run unit tests
       run: cargo test --verbose --manifest-path fitch-proof/Cargo.toml

@@ -12,9 +12,9 @@ This application takes Fitch proofs as they are defined in *Language, Proof and 
 
 # Installation and Development
 ## Web Interface
-You need to have rust and pnpm installed.
+You need Rust, pnpm 11, and `wasm-pack` installed.
 
-go into the `webui` dir and run `pnpm install`, then `pnpm build` (`pnpm dev` for a live dev server).
+Go into the `webui` directory and run `pnpm install`, then `pnpm build` (`pnpm --filter app dev` for a live dev server).
 
 the static web files will then be written to `webui/app/dist`
 

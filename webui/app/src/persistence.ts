@@ -2,11 +2,21 @@ import Alpine from "alpinejs";
 import * as monaco from "monaco-editor";
 import type { TabsStore } from "./stores";
 
+interface PersistedTab {
+  name: string;
+  uri: string;
+  proofTarget: string;
+  content: string;
+}
+
+interface PersistedTabs {
+  files: PersistedTab[];
+}
+
 let hasLoadedLocalStorage = false;
 export function saveToLocalStorage() {
   const storeData = Alpine.store("tabs");
 
-  // save to localstorage
   if (!hasLoadedLocalStorage) {
     return;
   }
@@ -17,30 +27,26 @@ export function saveToLocalStorage() {
   });
 
   localStorage.setItem("tabs", JSON.stringify({ files: data }));
-  // editor.setModel(monaco.editor.getModels()[storeData.current]);
-  console.log("saved!");
 }
 
 export function loadFromLocalStorage() {
-  const importedData = JSON.parse(localStorage.getItem("tabs")) as Omit<TabsStore, 'current'>;
+  const storedTabs = localStorage.getItem("tabs");
+  const importedData = storedTabs ? JSON.parse(storedTabs) as PersistedTabs : null;
   if (!importedData || !importedData.files) {
     hasLoadedLocalStorage = true;
     return;
   }
-  console.log("data is in right format");
   monaco.editor.getModels().forEach(m => m.dispose());
   const newTabsData: TabsStore = { current: 0, files: [] };
   let highestNewFile = 1;
   const loadedUris = new Set<string>();
   for (const tab of importedData.files) {
-    const tabUri = tab.uri.toString();
+    const tabUri = tab.uri;
     if (loadedUris.has(tabUri)) {
       continue;
     }
     loadedUris.add(tabUri);
-    // @ts-ignore
     const uri = monaco.Uri.parse(tab.uri);
-    // @ts-ignore 
     monaco.editor.createModel(tab.content, "fitch", uri);
     newTabsData.files.push({
       name: tab.name,
@@ -54,13 +60,9 @@ export function loadFromLocalStorage() {
     }
   }
 
-  if (newTabsData.current >= newTabsData.files.length - 1) {
-    Alpine.store("tabs").current = 0;
-
-  }
   Alpine.store("tabs").files = newTabsData.files;
+  Alpine.store("tabs").current = 0;
   Alpine.store("newFileCounter").value = highestNewFile + 1;
-  console.log("loaded tabs");
 
   hasLoadedLocalStorage = true;
 }
