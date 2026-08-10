@@ -15,10 +15,10 @@ It is accessible here: <https://fitch.rug.themisjudge.nl>
 If you want to build and run the application locally, then clone the repository, install Cargo if you haven't already and install `wasm-pack` (to compile Rust to WebAssembly) and do:
 
 ```
-wasm-pack build --target web
+wasm-pack build --target web --out-dir ../webui/pkg fitch-proof
 ```
 
-Once you have it compiled, open a server in the `fitch-proof` directory of the repository:
+Once you have it compiled, open a server in the `webui` directory of the repository:
 ```
 python3 -m http.server 8080
 ```
