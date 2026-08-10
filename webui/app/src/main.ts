@@ -87,20 +87,27 @@ function download_proof() {
 function to_latex() {
   const latex = export_to_latex(editor.getValue());
   sessionStorage.setItem("latex-exported-proof", latex);
-  window.open("latex_export", "_blank");
+  window.open("latex_export.html", "_blank");
 }
 
 let advanced_settings_are_visible = false;
 function toggle_show_advanced_settings() {
   advanced_settings_are_visible = !advanced_settings_are_visible;
-  document.getElementById("advanced-settings").hidden =
-    !advanced_settings_are_visible;
+  const advancedSettings = document.getElementById("advanced-settings");
+  advancedSettings.hidden = !advanced_settings_are_visible;
+  if (advanced_settings_are_visible) {
+    advancedSettings.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
 }
 
 let examples_are_visible = false;
 function show_examples() {
   examples_are_visible = !examples_are_visible;
-  document.getElementById("additional-examples").hidden = !examples_are_visible;
+  const examples = document.getElementById("additional-examples");
+  examples.hidden = !examples_are_visible;
+  if (examples_are_visible) {
+    examples.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
 }
 export function load_example(index: number) {
   newFile(examples[index]);
