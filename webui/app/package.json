@@ -23,8 +23,6 @@
   "dependencies": {
     "@fontsource-variable/fira-code": "^5.2.6",
     "@tailwindcss/vite": "^4.1.14",
-    "@tsparticles/engine": "^3.9.1",
-    "@tsparticles/preset-confetti": "^3.2.0",
     "@types/alpinejs": "^3.13.11",
     "@workspace/library": "workspace:*",
     "@ym-han/monaco-error-lens": "^0.1.3",

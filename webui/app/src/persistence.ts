@@ -11,7 +11,7 @@ export function saveToLocalStorage() {
     return;
   }
   const data = storeData.files.map((file) => {
-    const content = monaco.editor.getModel(file.uri).getValue();
+    const content = monaco.editor.getModel(file.uri)?.getValue() ?? "";
 
     return { ...file, content, uri: file.uri.toString() };
   });
@@ -31,14 +31,19 @@ export function loadFromLocalStorage() {
   monaco.editor.getModels().forEach(m => m.dispose());
   const newTabsData: TabsStore = { current: 0, files: [] };
   let highestNewFile = 1;
+  const loadedUris = new Set<string>();
   for (const tab of importedData.files) {
+    const tabUri = tab.uri.toString();
+    if (loadedUris.has(tabUri)) {
+      continue;
+    }
+    loadedUris.add(tabUri);
     // @ts-ignore
     const uri = monaco.Uri.parse(tab.uri);
     // @ts-ignore 
     monaco.editor.createModel(tab.content, "fitch", uri);
     newTabsData.files.push({
       name: tab.name,
-      confettiPlayed: tab.confettiPlayed,
       proofTarget: tab.proofTarget,
       uri
     });

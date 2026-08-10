@@ -2,7 +2,7 @@ import Alpine from "alpinejs";
 import * as monaco from "monaco-editor";
 
 export interface TabsStore {
-  files: { name: string, uri: monaco.Uri, proofTarget: string, confettiPlayed: boolean }[];
+  files: { name: string, uri: monaco.Uri, proofTarget: string }[];
   current: number;
 }
 
@@ -28,4 +28,3 @@ export function initStores() {
     }
   });
 }
-

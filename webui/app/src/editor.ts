@@ -6,19 +6,15 @@ import {
   getLineByMonacoNumber,
   getLineDepth,
   getLineType,
-  isFitchBar,
   replaceWithSymbols,
   wiggleFeedback
 } from "./helpers";
 import { saveToLocalStorage } from "./persistence";
 import {
   check_proof,
-  check_proof_with_template,
   format_proof,
   fix_line_numbers_in_proof
 } from "@workspace/library";
-import { confettiConfig } from "./confetti";
-import { tsParticles } from "@tsparticles/engine";
 
 export let editor: monaco.editor.IStandaloneCodeEditor;
 
@@ -175,7 +171,7 @@ function replace_words_by_fancy_symbols() {
 }
 
 
-export function process_user_input(firstRun = false) {
+export function process_user_input() {
   let model = editor.getModel();
   if (!model) {
     editor.setModel(monaco.editor.getModels()[Alpine.store("tabs").current]);
@@ -216,30 +212,6 @@ export function process_user_input(firstRun = false) {
     monaco.editor.setModelMarkers(model, "owner", []);
   }
 
-  const lastLineNr = model.getFullModelRange().endLineNumber;
-
-  const premises = [];
-  for (let lineNr = 1; lineNr < lastLineNr; lineNr++) {
-    const line = getLineByMonacoNumber(editorValue, lineNr);
-    if (isFitchBar(line)) break;
-    const content = line.split('|').at(-1).trimStart();
-    if (content) premises.push(content);
-  }
-
-  // check if proof target was reached
-  const tab = Alpine.store("tabs").files[Alpine.store("tabs").current];
-  const checkRes: string = check_proof_with_template(
-    model.getValue(),
-    [...premises, tab.proofTarget],
-    allowedVariableNamesField.value
-  );
-
-  if (checkRes.includes('correct') && !tab.confettiPlayed) {
-    tab.confettiPlayed = true;
-    if (!firstRun) {
-      tsParticles.load(confettiConfig);
-    }
-  }
 }
 
 export function initEditor() {

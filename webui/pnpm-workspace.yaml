@@ -1,3 +1,5 @@
 packages:
   - "app"
   - "library"
+allowBuilds:
+  esbuild: true

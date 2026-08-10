@@ -1,13 +1,10 @@
 // @ts-ignore
 import "@fontsource-variable/fira-code";
-// import "./style.css";
+import "./style.css";
 import {
   export_to_latex,
 } from "@workspace/library";
 import * as monaco from "monaco-editor";
-import { tsParticles } from "@tsparticles/engine";
-import "@tsparticles/preset-confetti";
-import { loadConfettiPreset } from '@tsparticles/preset-confetti';
 import examples from "./examples.ts";
 import excercises from "./excercises.ts";
 
@@ -40,9 +37,7 @@ const uri = monaco.Uri.parse("inmemory://" + helpers.makeUUID());
 const initModel = monaco.editor.createModel(initContent, "fitch", uri);
 
 Alpine.store('tabs').current = 0;
-Alpine.store('tabs').files = [{ name: 'new.txt', proofTarget: "", confettiPlayed: false, uri }];
-
-loadConfettiPreset(tsParticles);
+Alpine.store('tabs').files = [{ name: 'new.txt', proofTarget: "", uri }];
 
 monaco.languages.register({
   id: "fitch",
@@ -162,7 +157,6 @@ proofTargetEl.addEventListener("keyup", function(e) {
 
   const currentTab = Alpine.store("tabs").current;
   Alpine.store("tabs").files[currentTab].proofTarget = x.result;
-  Alpine.store("tabs").files[currentTab].confettiPlayed = false;
 
   // Restore cursor position
   const newPos = x.offset == -1 ? cursorPos : cursorPos - x.offset;
@@ -185,4 +179,4 @@ loadFromLocalStorage();
 const current = Alpine.store("tabs").current;
 editor.setModel(monaco.editor.getModels()[current]);
 
-process_user_input(true);
+process_user_input();

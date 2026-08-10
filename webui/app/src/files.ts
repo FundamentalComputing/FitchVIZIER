@@ -13,12 +13,20 @@ export function closeTab(index: number) {
   if (files.length < 2) {
     return;
   }
-  Alpine.store("tabs").files.splice(index, 1);
-  Alpine.store("tabs").current = 0;
+  const removedFile = files[index];
+  const current = Alpine.store("tabs").current;
+  files.splice(index, 1);
+  Alpine.store("tabs").current = current > index ? current - 1 : Math.min(current, files.length - 1);
 
   setTimeout(() => { // it errors without this and im too tired to fix it properly
-    monaco.editor.getModels()[index].dispose();
-    editor.setModel(monaco.editor.getModels()[0]);
+    const stillOpen = files.some(file => file.uri.toString() == removedFile.uri.toString());
+    if (!stillOpen) {
+      monaco.editor.getModel(removedFile.uri)?.dispose();
+    }
+    const currentFile = files[Alpine.store("tabs").current];
+    if (currentFile) {
+      editor.setModel(monaco.editor.getModel(currentFile.uri));
+    }
   }, 100);
 }
 
@@ -55,7 +63,15 @@ export async function openFile() {
   const file = await getFile();
   if (file) {
     const uri = await loadFileIntoMonaco(file);
-    const len = Alpine.store("tabs").files.push({ proofTarget: "", confettiPlayed: false, name: file.name, uri });
+    const existingTab = Alpine.store("tabs").files.findIndex(
+      tab => tab.uri.toString() == uri.toString()
+    );
+    if (existingTab >= 0) {
+      Alpine.store("tabs").current = existingTab;
+      saveToLocalStorage();
+      return;
+    }
+    const len = Alpine.store("tabs").files.push({ proofTarget: "", name: file.name, uri });
     Alpine.store("tabs").current = len - 1;
   }
   saveToLocalStorage();
@@ -66,9 +82,8 @@ export function newFile(content?: string) {
   const uri = monaco.Uri.parse(`inmemory://${makeUUID()}`);
   monaco.editor.createModel(content ?? initContent, "fitch", uri);
   const len = Alpine.store("tabs").files.push({
-    name: `new-${Alpine.store("newFileCounter").value}.txt`, proofTarget: "", confettiPlayed: false, uri
+    name: `new-${Alpine.store("newFileCounter").value}.txt`, proofTarget: "", uri
   });
   Alpine.store("tabs").current = len - 1;
   Alpine.store("newFileCounter").inc();
 }
-
