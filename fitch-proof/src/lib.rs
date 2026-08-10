@@ -113,8 +113,8 @@ pub fn proof_is_correct(proof: &str) -> bool {
 
 /// Takes in a proof string as input, and tries to format that proof.
 ///
-/// If formatting succeeds, the formatted string is returned. If formatting fails, the original
-/// string is returned.
+/// If formatting succeeds, the formatted string is returned. If formatting fails,
+/// returns "invalid"
 ///
 /// This function never panics.
 #[wasm_bindgen]
