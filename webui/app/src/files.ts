@@ -45,17 +45,10 @@ export function renameTab(index: number) {
 
 export async function loadFileIntoMonaco(file: File) {
   const content = await file.text();
-  const uri = monaco.Uri.parse(`file:///${file.name}`);
-  let model = monaco.editor.getModel(uri);
-  if (model) {
-    model.setValue(content);
-  } else {
-    model = monaco.editor.createModel(
-      content,
-      "fitch",
-      uri
-    );
-  }
+  const uri = monaco.Uri.parse(
+    `inmemory://opened/${encodeURIComponent(file.name)}-${makeUUID()}`
+  );
+  monaco.editor.createModel(content, "fitch", uri);
   return uri;
 }
 
@@ -63,14 +56,6 @@ export async function openFile() {
   const file = await getFile();
   if (file) {
     const uri = await loadFileIntoMonaco(file);
-    const existingTab = Alpine.store("tabs").files.findIndex(
-      tab => tab.uri.toString() == uri.toString()
-    );
-    if (existingTab >= 0) {
-      Alpine.store("tabs").current = existingTab;
-      saveToLocalStorage();
-      return;
-    }
     const len = Alpine.store("tabs").files.push({ proofTarget: "", name: file.name, uri });
     Alpine.store("tabs").current = len - 1;
   }
