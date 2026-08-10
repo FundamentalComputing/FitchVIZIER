@@ -34,7 +34,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - uses: pnpm/setup@v1
-        package-json-file: webui/package.json
+        with:
+          package-json-file: webui/package.json
         # with:
         #   version: 10
       - name: Install WASM-pack
