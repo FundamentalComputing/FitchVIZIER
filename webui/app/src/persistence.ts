@@ -1,12 +1,14 @@
 import Alpine from "alpinejs";
 import * as monaco from "monaco-editor";
+import { createFreshUri } from "./helpers";
 import type { TabsStore } from "./stores";
 
 interface PersistedTab {
   name: string;
-  uri: string;
   proofTarget: string;
   content: string;
+  // Kept optional so older saved data can still be read. It is never restored.
+  uri?: string;
 }
 
 interface PersistedTabs {
@@ -23,30 +25,62 @@ export function saveToLocalStorage() {
   const data = storeData.files.map((file) => {
     const content = monaco.editor.getModel(file.uri)?.getValue() ?? "";
 
-    return { ...file, content, uri: file.uri.toString() };
+    return { name: file.name, proofTarget: file.proofTarget, content };
   });
 
   localStorage.setItem("tabs", JSON.stringify({ files: data }));
 }
 
+function isPersistedTab(value: unknown): value is PersistedTab {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+
+  const tab = value as Record<string, unknown>;
+  return typeof tab.name === "string"
+    && typeof tab.proofTarget === "string"
+    && typeof tab.content === "string";
+}
+
 export function loadFromLocalStorage() {
-  const storedTabs = localStorage.getItem("tabs");
-  const importedData = storedTabs ? JSON.parse(storedTabs) as PersistedTabs : null;
-  if (!importedData || !importedData.files) {
+  let storedTabs: string | null;
+  try {
+    storedTabs = localStorage.getItem("tabs");
+  } catch {
     hasLoadedLocalStorage = true;
     return;
   }
+
+  if (storedTabs === null) {
+    hasLoadedLocalStorage = true;
+    return;
+  }
+
+  let importedData: unknown;
+  try {
+    importedData = JSON.parse(storedTabs);
+  } catch {
+    hasLoadedLocalStorage = true;
+    return;
+  }
+
+  if (typeof importedData !== "object" || importedData === null
+    || !Array.isArray((importedData as { files?: unknown }).files)) {
+    hasLoadedLocalStorage = true;
+    return;
+  }
+
+  const validTabs = (importedData as PersistedTabs).files.filter(isPersistedTab);
+  if (validTabs.length === 0) {
+    hasLoadedLocalStorage = true;
+    return;
+  }
+
   monaco.editor.getModels().forEach(m => m.dispose());
   const newTabsData: TabsStore = { current: 0, files: [] };
   let highestNewFile = 1;
-  const loadedUris = new Set<string>();
-  for (const tab of importedData.files) {
-    const tabUri = tab.uri;
-    if (loadedUris.has(tabUri)) {
-      continue;
-    }
-    loadedUris.add(tabUri);
-    const uri = monaco.Uri.parse(tab.uri);
+  for (const tab of validTabs) {
+    const uri = createFreshUri();
     monaco.editor.createModel(tab.content, "fitch", uri);
     newTabsData.files.push({
       name: tab.name,
@@ -54,9 +88,12 @@ export function loadFromLocalStorage() {
       uri
     });
 
-    if (tab.name.startsWith("new-")) {
-      const n = parseInt(tab.name.slice(4));
-      if (n > highestNewFile) highestNewFile = n;
+    const generatedName = /^new-(\d+)\.txt$/.exec(tab.name);
+    if (generatedName) {
+      const n = Number(generatedName[1]);
+      if (Number.isSafeInteger(n) && n > highestNewFile) {
+        highestNewFile = n;
+      }
     }
   }
 

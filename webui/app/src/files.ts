@@ -1,6 +1,6 @@
 import Alpine from "alpinejs";
 import * as monaco from "monaco-editor";
-import { getFile, makeUUID } from "./helpers";
+import { createFreshUri, getFile } from "./helpers";
 import { saveToLocalStorage } from "./persistence";
 
 export const initContent = `1 | A
@@ -45,9 +45,7 @@ export function renameTab(index: number) {
 
 export async function loadFileIntoMonaco(file: File) {
   const content = await file.text();
-  const uri = monaco.Uri.parse(
-    `inmemory://opened/${encodeURIComponent(file.name)}-${makeUUID()}`
-  );
+  const uri = createFreshUri(file.name);
   monaco.editor.createModel(content, "fitch", uri);
   return uri;
 }
@@ -64,7 +62,7 @@ export async function openFile() {
 
 
 export function newFile(content?: string) {
-  const uri = monaco.Uri.parse(`inmemory://${makeUUID()}`);
+  const uri = createFreshUri();
   monaco.editor.createModel(content ?? initContent, "fitch", uri);
   const len = Alpine.store("tabs").files.push({
     name: `new-${Alpine.store("newFileCounter").value}.txt`, proofTarget: "", uri

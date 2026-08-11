@@ -41,7 +41,7 @@ window.Alpine = Alpine;
 window.closeTab = closeTab;
 window.renameTab = renameTab;
 
-const uri = monaco.Uri.parse("inmemory://" + helpers.makeUUID());
+const uri = helpers.createFreshUri();
 const initModel = monaco.editor.createModel(initContent, "fitch", uri);
 
 Alpine.store('tabs').current = 0;
@@ -193,7 +193,11 @@ Alpine.effect(() => {
   );
 });
 
-window.addEventListener('storage', () => loadFromLocalStorage(), false); // listen for changes from other tabs
+window.addEventListener('storage', (event) => {
+  if (event.key === "tabs") {
+    loadFromLocalStorage();
+  }
+}, false); // listen for changes from other tabs
 loadFromLocalStorage();
 
 process_user_input();

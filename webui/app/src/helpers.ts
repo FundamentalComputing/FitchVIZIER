@@ -1,8 +1,19 @@
+import * as monaco from "monaco-editor";
+
 export function makeUUID() {
   var S4 = function() {
     return (((1 + Math.random()) * 0x10000) | 0).toString(16).substring(1);
   };
   return (S4() + S4() + "-" + S4() + "-" + S4() + "-" + S4() + "-" + S4() + S4() + S4());
+}
+
+export function createFreshUri(prefix?: string) {
+  let uri: monaco.Uri;
+  do {
+    const name = prefix ? `${encodeURIComponent(prefix)}-${makeUUID()}` : makeUUID();
+    uri = monaco.Uri.parse(`inmemory://${name}`);
+  } while (monaco.editor.getModel(uri));
+  return uri;
 }
 
 
