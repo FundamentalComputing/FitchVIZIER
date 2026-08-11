@@ -98,6 +98,17 @@ function to_latex() {
   window.open("latex_export.html", "_blank");
 }
 
+let info_is_visible = false;
+function show_info() {
+  info_is_visible = !info_is_visible;
+  const infoBlock = document.getElementById("additional-info");
+  infoBlock.hidden = !info_is_visible;
+  if (info_is_visible) {
+    infoBlock.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+}
+
+
 let advanced_settings_are_visible = false;
 function toggle_show_advanced_settings() {
   advanced_settings_are_visible = !advanced_settings_are_visible;
@@ -142,6 +153,7 @@ editor.onDidChangeModelContent(() => {
 editor.onDidChangeModel(() => editor.getModel() && process_user_input());
 
 // bottom bar
+document.getElementById("info-button").onclick = show_info;
 document.getElementById("format-button").onclick = format;
 document.getElementById("latex-button").onclick = to_latex;
 document.getElementById("load-example-button").onclick = show_examples;
