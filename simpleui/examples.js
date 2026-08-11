@@ -1,10 +1,10 @@
-let ex1 = `1 | A ∧ B
+const ex1 = `1 | A ∧ B
   |----
 2 | B             ∧ Elim: 1
 3 | A             ∧ Elim: 1
 4 | B ∧ A         ∧ Intro: 2, 3`;
 
-let ex2 = `1 | P(a) ∧ P(b)
+const ex2 = `1 | P(a) ∧ P(b)
 2 | (a=c) ∨ (b=c)
   |----
 3 | | a=c
@@ -18,8 +18,7 @@ let ex2 = `1 | P(a) ∧ P(b)
 8 | | P(c)                = Elim: 7, 6
 9 | P(c)                  ∨ Elim: 2, 3-5, 6-8`;
 
-
-let ex3 = `1  | ∀x ∃y R(x,y) → ∃y ∀x R(x,y)
+const ex3 = `1  | ∀x ∃y R(x,y) → ∃y ∀x R(x,y)
    |----
 2  | | ¬∃x (∀y ¬R(x,y) ∨ ∀y R(y,x))
    | |----
@@ -54,3 +53,5 @@ let ex3 = `1  | ∀x ∃y R(x,y) → ∃y ∀x R(x,y)
 25 | | ⊥                                       ∃ Elim: 17, 18-24
 26 | ¬¬∃x (∀y ¬R(x,y) ∨ ∀y R(y,x))             ¬ Intro: 2-25
 27 | ∃x (∀y ¬R(x,y) ∨ ∀y R(y,x))               ¬ Elim: 26`;
+
+export default [ex1, ex2, ex3];

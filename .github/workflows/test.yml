@@ -10,11 +10,27 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build:
+  test:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
+    - uses: pnpm/action-setup@v4
+      with:
+        version: 11
+        package_json_file: webui/package.json
+        run_install: false
+    - name: Install wasm-pack
+      run: cargo install wasm-pack --version 0.15.0 --locked
+    - name: Install and validate frontend
+      working-directory: ./webui
+      run: |
+        pnpm install --frozen-lockfile
+        pnpm --filter app run lint
+        pnpm build
+
     - name: Run unit tests
       run: cargo test --verbose --manifest-path fitch-proof/Cargo.toml
     - name: Run integration tests
       run: cargo test --verbose --manifest-path cli/Cargo.toml
+    - name: Check diff formatting
+      run: git diff --check

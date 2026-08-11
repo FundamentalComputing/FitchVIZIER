@@ -1,0 +1,8 @@
+{
+  "packageManager": "pnpm@11.21.0",
+  "scripts": {
+    "build:library": "pnpm --filter library run build",
+    "build:app": "pnpm --filter app run build",
+    "build": "pnpm build:library && pnpm build:app"
+  }
+}

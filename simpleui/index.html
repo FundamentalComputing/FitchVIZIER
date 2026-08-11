@@ -32,7 +32,9 @@
 
       function format() {
          let formatted = format_proof(document.getElementById("proof-field").value);
-         document.getElementById("proof-field").value = formatted;
+         if (formatted != "invalid") {
+             document.getElementById("proof-field").value = formatted;
+         }
          process_user_input();
       }
 

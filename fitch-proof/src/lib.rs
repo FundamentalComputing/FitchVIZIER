@@ -113,15 +113,15 @@ pub fn proof_is_correct(proof: &str) -> bool {
 
 /// Takes in a proof string as input, and tries to format that proof.
 ///
-/// If formatting succeeds, the formatted string is returned. If formatting fails, the original
-/// string is returned.
+/// If formatting succeeds, the formatted string is returned. If formatting fails,
+/// returns "invalid"
 ///
 /// This function never panics.
 #[wasm_bindgen]
 pub fn format_proof(proof: &str) -> String {
     match parser::parse_fitch_proof(proof) {
         Ok(lines) if !lines.is_empty() => formatter::format_proof(lines),
-        _ => proof.to_owned(),
+        _ => "invalid".to_string(),
     }
 }
 

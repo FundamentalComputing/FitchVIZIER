@@ -1,0 +1,132 @@
+<html>
+
+<head>
+  <title>Fitch proof LaTex Export</title>
+  <meta content="text/html;charset=utf-8" http-equiv="Content-Type" />
+  <style>
+    body {
+  text-align: center;
+  padding-left: 200px;
+  padding-right: 200px;
+  background-color: black;
+  color: white;
+  font-family: monospace;
+}
+
+a {
+  color: yellow;
+  text-decoration: none;
+}
+
+#additional-examples  a:link {
+    color: black;
+    text-decoration: underline;
+}
+textarea {
+  border: 4px solid black;
+  color: black;
+  border-radius: 10px;
+  padding: 8px;
+  font-family: monospace
+}
+
+textarea:disabled {
+  background-color: lightgray;
+}
+
+
+.important-box {
+  border: 3px solid black;
+  color: black;
+  font-size: 20px;
+  margin: 2mm;
+  background-color: white;
+  display: inline-block;
+  padding: 4mm;
+  border-radius: 12px;
+}
+
+button {
+  padding: 9px 9px;
+}
+
+code {
+  background-color: gray;
+}
+  </style>
+</head>
+
+<body>
+  <strong style="font-size:50px;color:white;">Fitch<em>VIZIER</em></strong><br>
+  <br><br>
+
+  <h1>LaTeX export:</h1>
+  <textarea spellcheck="false" disabled rows=30 cols=90 id="latex-export-field">
+  </textarea><br>
+
+  <br>
+  <div>Note that the LaTeX might not compile if the proof you exported was in a very bad state.
+  </div>
+
+  <h1>How to use this LaTeX export?</h1>
+  <div>
+    In order to be able to compile this proof in LaTeX, you should do two things.
+
+    <br>
+    First, make sure that you have access to the <code>fitch</code> package by Peter Selinger (<a
+      href="https://ctan.org/pkg/fitch">https://ctan.org/pkg/fitch</a>), and
+    put on the top of your document:
+    <br>
+    <br>
+    <br>
+    <code style="font-size:18px">\usepackage{fitch}</code>
+    <br>
+    <br>
+    <br>
+    If the <code>fitch</code> package is not installed on your system, you can place the file <code>fitch.sty</code>
+    from <a href="https://github.com/OpenLogicProject/fitch/">https://github.com/OpenLogicProject/fitch/</a>
+    it in the same directory as the other file(s) you want to compile. If you do this, the
+    <code>\usepackage{fitch}</code> should
+    also work.
+
+    <br><br>
+    Secondly, you should put the following configuration somewhere on top of your document:
+    <br>
+    <br>
+    <textarea disabled rows="26" cols="50">
+      \setkeys{fitch}{indent=1em,depth=0.6em,height=1.7em}
+      \renewcommand{\ndjustformat}[2]{#1: #2}
+      \def\ndrules{
+      \def\ii{\by{$\rightarrow\,$Intro}}
+      \def\ie{\by{$\rightarrow\,$Elim}}
+      \def\idi{\by{$=\,$Intro}{}}
+      \def\ide{\by{$=\,$Elim}}
+      \def\Ai{\by{$\forall\,$Intro}}
+      \def\Ae{\by{$\forall\,$Elim}}
+      \def\Ei{\by{$\exists\,$Intro}}
+      \def\Ee{\by{$\exists\,$Elim}}
+      \def\ai{\by{$\wedge\,$Intro}}
+      \def\ae{\by{$\wedge\,$Elim}}
+      \def\ai{\by{$\wedge\,$Intro}}
+      \def\ae{\by{$\wedge\,$Elim}}
+      \def\oi{\by{$\vee\,$Intro}}
+      \def\oe{\by{$\vee\,$Elim}}
+      \def\ni{\by{$\neg\,$Intro}}
+      \def\ne{\by{$\neg\,$Elim}}
+      \def\bi{\by{$\bot\,$Intro}}
+      \def\be{\by{$\bot\,$Elim}}
+      \def\bci{\by{$\leftrightarrow\,$Intro}}
+      \def\bce{\by{$\leftrightarrow\,$Elim}}
+      \def\r{\by{Reit}}}
+    </textarea>
+    <br><br>
+    That's all!
+    <br>
+    <br>
+  </div>
+  <script>
+    document.getElementById("latex-export-field").value = sessionStorage.getItem("latex-exported-proof");
+  </script>
+</body>
+
+</html>

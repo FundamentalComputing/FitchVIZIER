@@ -33,17 +33,22 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Install WASM-pack
-        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
-      - name: Build to WASM
-        run: wasm-pack build --release --target web --out-dir ../webui/pkg fitch-proof
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+          package_json_file: webui/package.json
+          run_install: false
+      - name: Install wasm-pack
+        run: cargo install wasm-pack --version 0.15.0 --locked
       - name: Setup Pages
         uses: actions/configure-pages@v5
+      - name: Build deployment artifact
+        run: ./build.sh
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
           # Upload only this directory (recursively)
-          path: './webui'
+          path: './webui/app/dist'
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4

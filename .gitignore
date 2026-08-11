@@ -1,1 +1,4 @@
-/webui/pkg
+.pnpm-store/
+node_modules
+dist
+simpleui/pkg/
