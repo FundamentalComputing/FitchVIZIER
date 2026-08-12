@@ -11,11 +11,19 @@ use std::process::{Command, Stdio};
 
 #[test]
 fn run_integration_tests() {
-    run_integration_tests_dir(Path::new("tests/test_cases"));
-    run_integration_tests_dir(Path::new("tests/private"));
+    let mut failed: Vec<String> = Vec::new();
+    run_integration_tests_dir(Path::new("tests/test_cases"), &mut failed);
+    run_integration_tests_dir(Path::new("tests/private"), &mut failed);
+
+    if !failed.is_empty() {
+        panic!(
+            "Some integration tests failed:\n\n{}",
+            failed.join("\n\n--------------------\n\n")
+        );
+    }
 }
 
-fn run_integration_tests_dir(dir : &Path) {
+fn run_integration_tests_dir(dir : &Path, failed: &mut Vec<String>) {
     let cli_path = env!("CARGO_BIN_EXE_cli");
     let test_cases_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join(dir);
 
@@ -65,17 +73,18 @@ fn run_integration_tests_dir(dir : &Path) {
             let stdout = String::from_utf8_lossy(&output.stdout);
             let stderr = String::from_utf8_lossy(&output.stderr);
 
-            if !stderr.is_empty() {
-                panic!("Test for {} failed with stderr:\n{}", stem, stderr);
+            let expected_output = fs::read_to_string(&expected_file)
+                .expect(&format!("Failed to read expected file: {:?}", expected_file));
+
+            if !stderr.is_empty() || stdout.trim() != expected_output.trim() {
+                failed.push(format!(
+                    "Test {} failed.\nstdout:\n{}\nstderr:\n{}\nexpected:\n{}\n",
+                    stem,
+                    stdout,
+                    stderr,
+                    expected_output.trim()
+                ));
             }
-
-            let expected_output = fs::read_to_string(&expected_file).
-                expect(&format!("Failed to read expected file: {:?}", expected_file));
-
-            assert_eq!(stdout.trim(),
-                       expected_output.trim(),
-                       "Test failed for {}",
-                       stem);
         }
     }
 }
