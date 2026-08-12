@@ -88,3 +88,71 @@ fn run_integration_tests_dir(dir : &Path, failed: &mut Vec<String>) {
         }
     }
 }
+
+
+#[test]
+fn reuses_template_for_multiple_proofs_2() {
+    let cli_path = env!("CARGO_BIN_EXE_cli");
+    let test_cases_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/test_cases");
+    let proof_file = test_cases_dir.join("test_socrates.txt");
+    let proof_file2 = test_cases_dir.join("test_eq_elim1.txt");
+    let template = fs::read_to_string(test_cases_dir.join("test_socrates.template"))
+        .expect("Failed to read template");
+    let expected = fs::read_to_string(test_cases_dir.join("test_socrates.expected"))
+        .expect("Failed to read expected output");
+
+    let mut child = Command::new(cli_path)
+        .arg(&proof_file)
+        .arg(&proof_file)
+        .arg(&proof_file2)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn()
+        .expect("Failed to spawn child process");
+    child
+        .stdin
+        .take()
+        .expect("Failed to open stdin")
+        .write_all(template.as_bytes())
+        .expect("Failed to write template");
+
+    let output = child.wait_with_output().expect("Failed to read stdout");
+    assert!(output.status.success());
+    assert_eq!(
+        String::from_utf8_lossy(&output.stdout).trim(),
+        format!("{}\n{}\nThe premises of your proof do not match the premises in the proof template.\n\nThe conclusion of your proof does not match the conclusion in the proof template.", expected.trim(), expected.trim())
+    );
+}
+
+#[test]
+fn reuses_template_for_multiple_proofs() {
+    let cli_path = env!("CARGO_BIN_EXE_cli");
+    let test_cases_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/test_cases");
+    let proof_file = test_cases_dir.join("test_socrates.txt");
+    let template = fs::read_to_string(test_cases_dir.join("test_socrates.template"))
+        .expect("Failed to read template");
+    let expected = fs::read_to_string(test_cases_dir.join("test_socrates.expected"))
+        .expect("Failed to read expected output");
+
+    let mut child = Command::new(cli_path)
+        .arg(&proof_file)
+        .arg(&proof_file)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn()
+        .expect("Failed to spawn child process");
+    child
+        .stdin
+        .take()
+        .expect("Failed to open stdin")
+        .write_all(template.as_bytes())
+        .expect("Failed to write template");
+
+    let output = child.wait_with_output().expect("Failed to read stdout");
+    assert!(output.status.success());
+    assert_eq!(
+        String::from_utf8_lossy(&output.stdout).trim(),
+        format!("{}\n{}", expected.trim(), expected.trim())
+    );
+}
+

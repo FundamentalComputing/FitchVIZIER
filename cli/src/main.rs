@@ -33,21 +33,30 @@ const DEFAULT_ALLOWED_VARIABLE_NAMES: &str = "x,y,z,u,v,w";
 fn main() {
     let args = Args::parse();
 
-    let no_template = args.no_template;
-    let summary = args.summary;
     let debug = args.debug;
+    let summary = args.summary;
+    let template = if args.no_template {
+        None
+    } else {
+        Some(
+            std::io::stdin()
+                .lines()
+                .map(|s| s.unwrap().trim().to_string())
+                .collect::<Vec<String>>(),
+        )
+    };
 
     for proof_file in &args.path {
-        check_file(no_template, debug, proof_file)
+        check_file(template.as_deref(), proof_file, debug)
     }
-    
+
     if summary {
         summaries_files(&args.path);
     }
 
 }
 
-fn check_file(no_template : bool, debug: bool, proof_file : &String) {
+fn check_file(template: Option<&[String]>, proof_file : &String, debug: bool) {
     let variables = DEFAULT_ALLOWED_VARIABLE_NAMES.to_string();
 
     let Ok(proof) = std::fs::read_to_string(proof_file) else {
@@ -58,18 +67,14 @@ fn check_file(no_template : bool, debug: bool, proof_file : &String) {
         std::process::exit(1)
     };
 
-    let result: String = if no_template {
-        fitch_proof::check_proof(&proof, &variables)
-    } else {
-        let template: Vec<String> = std::io::stdin()
-            .lines()
-            .map(|s| s.unwrap().trim().to_string())
-            .collect();
-        fitch_proof::check_proof_with_template(&proof, template, &variables)
+    let result: String = match template {
+        None => fitch_proof::check_proof(&proof, &variables),
+        Some(template) => {
+            fitch_proof::check_proof_with_template(&proof, template.to_vec(), &variables)
+        }
     };
     println!("{}", result);
     if debug {
         println!("\nDebug proof with locations:\n{}", fitch_proof::debug_proof_with_locations(&proof));
     }
-
 }
