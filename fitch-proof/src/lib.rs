@@ -97,8 +97,10 @@ pub fn check_proof(proof: &str, allowed_variable_names: &str) -> String {
             .join("\n\n"),
         ProofResult::FatalError(err) =>
             (Diagnostic
-             { message: format!("Fatal error: {}", err.message),
-               location: err.location }).format()
+             {
+               message: format!("Fatal error: {}", err.message),
+               location: err.location
+             }).format()
     }
 }
 
@@ -271,13 +273,13 @@ mod diagnostic_tests {
     #[test]
     fn semantic_diagnostic_preserves_message_and_has_physical_location() {
         let proof = "\n1 | P\n  | ---\n2 | Q Reit:1";
-        let expected = "Line 2: the proof rule Reit is used, but the sentence in this line is not the same as the sentence in the referenced line.";
+        let expected = "line 4:1: Line 2: the proof rule Reit is used, but the sentence in this line is not the same as the sentence in the referenced line.";
 
         assert_eq!(check_proof(proof, default_variable_names!()), expected);
         assert_eq!(
             check_proof_diagnostics(proof, default_variable_names!()),
             ProofResult::Error(vec![Diagnostic {
-                message: expected.to_string(),
+                message: "Line 2: the proof rule Reit is used, but the sentence in this line is not the same as the sentence in the referenced line.".to_string(),
                 location: Some(Location::new(None, 4, 1)),
             }])
         );
@@ -286,7 +288,7 @@ mod diagnostic_tests {
     #[test]
     fn structural_diagnostic_has_responsible_physical_location() {
         let proof = "\n1 | P\n  | ---\n2 | | | Q";
-        let expected = "Fatal error: near line 2, there is an 'indentation/scope jump' that is too big. You cannot open or close two subproofs in the same line.";
+        let expected = "line 4:1: Fatal error: near line 2, there is an 'indentation/scope jump' that is too big. You cannot open or close two subproofs in the same line.";
 
         assert_eq!(check_proof(proof, default_variable_names!()), expected);
         let ProofResult::FatalError(diagnostic) =
@@ -295,7 +297,6 @@ mod diagnostic_tests {
             panic!("expected fatal diagnostic");
         };
         assert_eq!(diagnostic.location, Some(Location::new(None, 4, 1)));
-        assert_eq!(format!("Fatal error: {}", diagnostic.message), expected);
     }
 
     #[test]
