@@ -15,6 +15,10 @@ type LToken = WithLoc<Token>;
 /// For a specification of the grammar that is used for parsing, see the documentation of the
 /// functions [parse_proof_line] and [parse_logical_expr].
 pub fn parse_fitch_proof(proof: &str) -> Result<Vec<LProofNode>, String> {
+    parse_fitch_proof_diagnostic(proof).map_err(|diagnostic| diagnostic.message)
+}
+
+pub(crate) fn parse_fitch_proof_diagnostic(proof: &str) -> Result<Vec<LProofNode>, Diagnostic> {
     let mut last_line_num = 0;
     proof
         .lines()
@@ -26,13 +30,30 @@ pub fn parse_fitch_proof(proof: &str) -> Result<Vec<LProofNode>, String> {
             Some(match lex_with_line(line, Some(idx + 1)) {
                 Ok(toks) => match parse_proof_line(&toks) {
                     Ok(node) => {
-                        last_line_num = node.line_num()
-                            .unwrap_or(last_line_num);
+                        last_line_num = node.line_num().unwrap_or(last_line_num);
                         Ok(node)
                     }
-                    Err(err) => Err(format!("parser failure near line {}: {}", last_line_num + 1, err)),
+                    Err(err) => Err(Diagnostic {
+                        message: format!("parser failure near line {}: {}", last_line_num + 1, err.message).to_string(),
+                        // if parse_proof_line did not deteremine precise location inside the line, then the whole line
+                        //   is a culprit
+                        location: Some(match err.location {
+                            Some(loc) => loc,
+                            None => Location::new(None, idx+1,0)
+                        })
+                    }),
                 },
-                Err(err) => Err(format!("lexer failure near line {}: {}", last_line_num + 1, err)),
+                Err(err) => Err(Diagnostic {
+                    message: format!(
+                        "lexer failure near line {}: {}",
+                        last_line_num + 1,
+                        err.message
+                    ),
+                    location: Some(match err.location {
+                        Some(loc) => loc,
+                        None => Location::new(None, idx+1,0)
+                    })
+                }),
             })
         })
         .collect()
@@ -51,7 +72,7 @@ pub fn parse_allowed_variable_names(allowed_var_names: &str) -> Result<HashSet<S
     let toks = match lex(allowed_var_names) {
         Ok(toks) => toks,
         Err(err) => {
-            return Err(format!("failure when lexing list of allowed variable names: {err}"))
+            return Err(format!("failure when lexing list of allowed variable names: {}", err.message))
         }
     };
     let err_str = "the list of allowed variable names could not be parsed".to_string();
@@ -75,7 +96,10 @@ pub fn parse_allowed_variable_names(allowed_var_names: &str) -> Result<HashSet<S
             return Err(format!("the list of allowed variable names could not be parsed: a variable name must start with a lowercase letter: {}", var_name));
         }
         if allowed_variable_names.contains(var_name) {
-            return Err(format!("the list of allowed variable names contains duplicates: {}", var_name));
+            return Err(format!(
+                "the list of allowed variable names contains duplicates: {}",
+                var_name
+            ));
         }
         allowed_variable_names.insert(var_name.to_string());
         if rem_toks.len() == 1 {
@@ -161,11 +185,11 @@ enum Token {
 }
 
 /// Generate a list of [Token]s from a [String]. If the lexer fails, a nice error message is returned.
-fn lex(input: &str) -> Result<Vec<LToken>, String> {
+fn lex(input: &str) -> Result<Vec<LToken>, Diagnostic> {
     lex_with_line(input, None)
 }
 
-fn lex_with_line(input: &str, line_number: Option<usize>) -> Result<Vec<LToken>, String> {
+fn lex_with_line(input: &str, line_number: Option<usize>) -> Result<Vec<LToken>, Diagnostic> {
     let mut toks: Vec<LToken> = Vec::new();
     let mut input_iter = input.chars().peekable();
     let line = line_number.unwrap_or(1);
@@ -204,10 +228,13 @@ fn lex_with_line(input: &str, line_number: Option<usize>) -> Result<Vec<LToken>,
                 let loc = pos.clone();
                 pos.advance_by(num_str.len() - 1);
                 match num_str.parse::<usize>() {
-                    Ok(n) if n <= 999_999_999 => {
-                        toks.push(WithLoc::new(Token::Number(n), loc))
+                    Ok(n) if n <= 999_999_999 => toks.push(WithLoc::new(Token::Number(n), loc)),
+                    _ => {
+                        return Err(Diagnostic {
+                            message: err,
+                            location: Some(loc),
+                        })
                     }
-                    _ => return Err(err),
                 }
             }
             '|' => {
@@ -215,8 +242,7 @@ fn lex_with_line(input: &str, line_number: Option<usize>) -> Result<Vec<LToken>,
                     .chain(from_fn(|| input_iter.by_ref().next_if(|c| *c == '|' || *c == ' ')))
                     .collect();
                 // how many bares we actually have
-                let count =
-                    full_bar_str.chars().filter(|c| *c == '|').count();
+                let count = full_bar_str.chars().filter(|c| *c == '|').count();
                 let loc = pos.clone();
                 pos.advance_by(full_bar_str.len() - 1);
 
@@ -230,7 +256,10 @@ fn lex_with_line(input: &str, line_number: Option<usize>) -> Result<Vec<LToken>,
             _ => {
                 let mut err: String = "invalid character found: ".to_owned();
                 err.push(ch);
-                return Err(err);
+                return Err(Diagnostic {
+                    message: err,
+                    location: Some(pos.clone()),
+                });
             }
         }
     }
@@ -244,9 +273,14 @@ fn lex_with_line(input: &str, line_number: Option<usize>) -> Result<Vec<LToken>,
 ///
 /// The grammar: see documentation of [parser::parse_logical_expression_string].
 ///
-fn parse_logical_expr(toks: &[LToken]) -> Result<LWff, String> {
+/// if the resulting Diagnostic has location: None, then we take it that the whole line is at fault
+/// TODO: more precise error location
+fn parse_logical_expr(toks: &[LToken]) -> Result<LWff, Diagnostic> {
     if toks.is_empty() {
-        return Err("parse_logical_expression: no tokens to parse".to_string())
+        return Err(Diagnostic {
+            message: "parse_logical_expression: no tokens to parse".to_string(),
+            location: None
+        });
     }
     let loc = toks.first().unwrap().location();
     if let Some((wff, rem_toks)) = parse_e1(toks) {
@@ -254,10 +288,17 @@ fn parse_logical_expr(toks: &[LToken]) -> Result<LWff, String> {
         if rem_toks.is_empty() {
             return Ok(wff);
         } else {
-            return Err(format!("failed to parse logical expression near {}", loc));
+            return Err(Diagnostic {
+                message: format!("failed to parse logical expression"),
+                location: Some(loc.clone())
+            });
         }
+    } else {
+        return Err(Diagnostic {
+            message: format!("failed to parse logical expression"),
+            location: Some(loc.clone())
+        });
     }
-    Err(format!("failed to parse logical expression near {}", loc))
 }
 
 /// Parse an `<E1>` as defined by the grammar specified in the documentation of [parse_logical_expr].
@@ -362,16 +403,14 @@ fn parse_e3(toks: &[LToken]) -> Option<(LWff, &[LToken])> {
             let (var, rem_toks1) = parse_name(&toks[1..])?;
             let (expr, rem_toks2) = parse_e3(rem_toks1)?;
             let loc = first.location().clone();
-            Some((WithLoc::new(Wff::Forall(var.to_owned(), Box::new(expr)), loc),
-                  rem_toks2))
+            Some((WithLoc::new(Wff::Forall(var.to_owned(), Box::new(expr)), loc), rem_toks2))
         }
         // <E3> => exists <VarName> <E3>
         Token::Exists => {
             let (var, rem_toks1) = parse_name(&toks[1..])?;
             let (expr, rem_toks2) = parse_e3(rem_toks1)?;
             let loc = first.location().clone();
-            Some((WithLoc::new(Wff::Exists(var.to_owned(), Box::new(expr)), loc),
-                  rem_toks2))
+            Some((WithLoc::new(Wff::Exists(var.to_owned(), Box::new(expr)), loc), rem_toks2))
         }
         // <E3> => bottom
         Token::Bottom => {
@@ -395,10 +434,10 @@ fn parse_term(toks: &[LToken]) -> Option<(LTerm, &[LToken])> {
     let loc = first.location().clone();
 
     match parse_arg_list(rem_toks) {
-        Some((terms, rem_toks)) =>
-            Some((WithLoc::new(Term::FuncApp(name.to_string(), terms), loc), rem_toks)),
-        None =>
-            Some((WithLoc::new(Term::Atomic(name.to_string()), loc), rem_toks))
+        Some((terms, rem_toks)) => {
+            Some((WithLoc::new(Term::FuncApp(name.to_string(), terms), loc), rem_toks))
+        }
+        None => Some((WithLoc::new(Term::Atomic(name.to_string()), loc), rem_toks)),
     }
 }
 
@@ -492,13 +531,17 @@ fn parse_arg_list(toks: &[LToken]) -> Option<(Vec<LTerm>, &[LToken])> {
 /// then we parse the justification first. If the line ends with =Intro, then we also parse the
 /// justification first (=Intro is the only justification without colon). For the rest, everything
 /// can just be done normally from left to right.
-fn parse_proof_line(toks: &[LToken]) -> Result<LProofNode, String> {
+///
+/// if the resulting Diagnostic has location: None, then we take it that the whole line is at fault
+fn parse_proof_line(toks: &[LToken]) -> Result<LProofNode, Diagnostic> {
     if toks.is_empty() {
-        return Err("one proof line appears to be empty".to_string());
+        return Err(Diagnostic {
+            message: "proof line appears to be empty".to_string(),
+            location: None
+        });
     }
 
-    let has_colon = toks.iter()
-        .any(|t| matches!(t.value(), Token::Colon));
+    let has_colon = toks.iter().any(|t| matches!(t.value(), Token::Colon));
     let ends_with_intro = toks.len() >= 2
         && matches!(toks.last().unwrap().value(), Token::Name(name) if name == "Intro")
         && matches!(toks[toks.len() - 2].value(), Token::Equals);
@@ -514,13 +557,37 @@ fn parse_proof_line(toks: &[LToken]) -> Result<LProofNode, String> {
 }
 
 /// Assumes that `toks` is non-empty
-fn parse_line_with_justification(toks: &[LToken]) -> Result<LProofNode, String> {
-    let colon_index =
-        toks.iter().position(|t| matches!(t.value(), Token::Colon)).unwrap_or(toks.len());
+fn parse_line_with_justification(toks: &[LToken]) -> Result<LProofNode, Diagnostic> {
+    let number_tok = toks.first();
+    let depth_tok = toks.get(1);
+
+    let Some(Token::Number(line_num)) = number_tok.map(|t| t.value()) else {
+        return Err(Diagnostic {
+            message: "a proof line with justification must start with a line number".to_string(),
+            location: None // highlight the whole lline
+        });
+    };
+    let Some(Token::ConseqVertBar(depth)) = depth_tok.map(|t| t.value()) else {
+        return Err(Diagnostic {
+            message: "after the line number, there should be at least one vertical bar".to_string(),
+            location: depth_tok.map(|t| t.location().clone())
+        });
+    };
+
+
+    let first_colon = toks.iter().enumerate().
+        find(|(_, t)| matches!(t.value(), Token::Colon));
+
+    let (colon_index, ot) = match first_colon {
+        Some ((ci, t)) => (ci, Some(t)),
+        None => (toks.len(), None)
+    };
+    
     if colon_index < 4 {
-        return Err(
-            "failed to parse proof line. The proof line contains a colon, but this colon appears so early that it cannot possibly be a justification".to_string()
-        );
+        return Err(Diagnostic {
+            message: "failed to parse proof line. The proof line contains a colon, but this colon appears so early that it cannot possibly be a justification".to_string(),
+            location: ot.map(|t| t.location().clone())
+        });
     }
 
     let (before_just, just_slice) = if let Token::Name(name) = toks[colon_index - 1].value() {
@@ -528,34 +595,26 @@ fn parse_line_with_justification(toks: &[LToken]) -> Result<LProofNode, String> 
             "Reit" => (&toks[..colon_index - 1], &toks[colon_index - 1..]),
             "Intro" | "Elim" => (&toks[..colon_index - 2], &toks[colon_index - 2..]),
             _ => {
-                return Err(format!(
-                    "failed to parse justification. Expected 'Reit', 'Intro' or 'Elim', found '{name}'. Note that capitalization matters!"
-                ));
+                return Err(Diagnostic {
+                    message: format!("failed to parse justification. Expected 'Reit', 'Intro' or 'Elim', found '{name}'. Note that capitalization matters!"),
+                    location: Some(toks[colon_index - 1].location().clone())
+                });
             }
         }
     } else {
-        return Err("sentence contains a colon, which was expected to be preceded by 'Intro', 'Elim' or 'Reit', but the parser did not find any of these.".to_string());
+        return Err(Diagnostic {
+            message: "sentence contains a colon, which was expected to be preceded by 'Intro', 'Elim' or 'Reit', but the parser did not find any of these.".to_string(),
+            location: Some(toks[colon_index - 1].location().clone())
+        });
     };
-
-    let number_tok = before_just
-        .first()
-        .ok_or_else(|| "a proof line must start with a line number".to_string())?;
-    let depth_tok = before_just.get(1).ok_or_else(|| {
-        "after the line number, there should be at least one vertical bar".to_string()
-    })?;
-
-    let Token::Number(line_num) = number_tok.value() else {
-        return Err("a proof line with justification must start with a line number".to_string());
-    };
-    let Token::ConseqVertBar(depth) = depth_tok.value() else {
-        return Err("after the line number, there should be at least one vertical bar".to_string());
-    };
+    
 
     let sentence_tokens = before_just.get(2..).unwrap_or(&[]);
     let sentence = parse_logical_expr(sentence_tokens)?;
     let justification = parse_justification(just_slice)?;
 
-    let node_loc = number_tok.location().clone();
+    // at this point number_tok has to be defined
+    let node_loc = number_tok.unwrap().location().clone();
     Ok(WithLoc::new(
         ProofNode::Numbered(NumberedLine {
             line_num: *line_num,
@@ -569,7 +628,9 @@ fn parse_line_with_justification(toks: &[LToken]) -> Result<LProofNode, String> 
 }
 
 /// Assumes that `toks` is non-empty
-fn parse_line_without_justification(toks: &[LToken]) -> Result<LProofNode, String> {
+/// if the resulting Diagnostic has location: None, then we take it that the whole line is at fault
+/// TODO: more precise error location for the boxed constants case
+fn parse_line_without_justification(toks: &[LToken]) -> Result<LProofNode, Diagnostic> {
     // Now we must be in one if these cases:
     //  1) opening a new scope
     //     <num> '|' { '|' } <E1>
@@ -583,11 +644,11 @@ fn parse_line_without_justification(toks: &[LToken]) -> Result<LProofNode, Strin
     match first.value() {
         Token::Number(line_num) => {
             // we must be in the case 1 and 2
-            let Some(Token::ConseqVertBar(depth))
-                = toks.get(1).map(|x| x.value()) else {
-                return Err(
-                    "after the line number, there should be at least one vertical bar".to_string()
-                );
+            let Some(Token::ConseqVertBar(depth)) = toks.get(1).map(|x| x.value()) else {
+                return Err(Diagnostic {
+                    message: "after the line number, there should be at least one vertical bar".to_string(),
+                    location: Some(first.location().clone())
+                });
             };
 
             // try to parse a boxed constant
@@ -597,23 +658,27 @@ fn parse_line_without_justification(toks: &[LToken]) -> Result<LProofNode, Strin
             // first positon in `toks` where we start with the formula
             // this going to be either 2 ( if there is no boxed constant )
             // or 5 (if there is one )
-            let expression_start = if let
-                (Some(Token::LSqBracket),
-                 Some(name_tok),
-                 Some(Token::RSqBracket)) =
-                (toks.get(2).map(|x| x.value()),
-                 toks.get(3),
-                 toks.get(4).map(|x| x.value()))
+            let expression_start = if let (
+                Some(Token::LSqBracket),
+                Some(name_tok),
+                Some(Token::RSqBracket),
+            ) =
+                (toks.get(2).map(|x| x.value()), toks.get(3), toks.get(4).map(|x| x.value()))
             {
+                let loc = name_tok.location().clone();
                 let Token::Name(name) = name_tok.value() else {
-                    return Err("boxed constants must be names".to_string());
+                    return Err(Diagnostic {
+                        message: "boxed constants must be names".to_string(),
+                        location: Some(loc)
+                    });
                 };
                 if !name.chars().next().unwrap_or('U').is_ascii_lowercase() {
-                    return Err(
-                        "a boxed constant must be a constant; it should start with a lowercase letter".to_string()
-                    );
+                    return Err(Diagnostic {
+                        message: "a boxed constant must be a constant; it should start with a lowercase letter".to_string(),
+                        location: Some(loc)
+                    });
                 }
-                let loc = name_tok.location().clone();
+                
                 const_between = Some(WithLoc::new(Term::Atomic(name.to_string()), loc));
                 // the line introduces a boxed constant and nothing else
                 if toks.len() == 5 {
@@ -637,7 +702,11 @@ fn parse_line_without_justification(toks: &[LToken]) -> Result<LProofNode, Strin
             let has_brackets = toks.iter().any(|t| matches!(t.value(), Token::LSqBracket))
                 || toks.iter().any(|t| matches!(t.value(), Token::RSqBracket));
             if has_brackets && expression_start != 5 {
-                return Err("failed when trying to read boxed constant (if you did not intend to introduce a boxed constant in this proof line, remove '[' and ']').".to_string());
+                return Err(Diagnostic {
+                    message:
+                      "failed when trying to read boxed constant (if you did not intend to introduce a boxed constant in this proof line, remove '[' and ']').".to_string(),
+                    location: None // TODO!!! change me
+                });
             }
 
             let sentence_tokens = &toks[expression_start..];
@@ -648,7 +717,10 @@ fn parse_line_without_justification(toks: &[LToken]) -> Result<LProofNode, Strin
             };
 
             if wff.is_none() && const_between.is_none() {
-                return Err("a proof line must contain a sentence or introduce a boxed constant".to_string());
+                return Err(Diagnostic {
+                    message: "a proof line must contain a sentence or introduce a boxed constant".to_string(),
+                    location: None
+                });
             }
 
             let node_loc = first.location().clone();
@@ -685,27 +757,44 @@ fn parse_line_without_justification(toks: &[LToken]) -> Result<LProofNode, Strin
                     loc,
                 ))
             } else {
-                Err("when a line starts with only scope markers, it may only contain '-' after those markers.".to_string())
+                Err(Diagnostic {
+                    message: "unnumberd lines can only be empty or can only contain horizontal bars -".to_string(),
+                    location: None
+                })
             }
         }
         _ => {
-            Err("each text line must start either with a line number or a vertical bar".to_string())
+            Err(Diagnostic {
+                message: "each text line must start either with a line number or a vertical bar |".to_string(),
+                location: None
+            })
         }
     }
 }
 
 /// Parse a justification, as specified by the grammar defined in the documentation for
 /// [parse_proof_line].
-fn parse_justification(toks: &[LToken]) -> Result<LJustification, String> {
-    let plain: Vec<Token> = toks.iter().map(|tok| tok.value().clone()).collect();
-    let justification = parse_justification_tokens(&plain)?;
+fn parse_justification(toks: &[LToken]) -> Result<LJustification, Diagnostic> {
+    let justification = parse_justification_tokens(toks)?;
     let loc = toks.first().map(|tok| tok.location().clone()).unwrap_or_else(Location::dummy);
     Ok(WithLoc::new(justification, loc))
 }
 
-fn parse_justification_tokens(toks: &[Token]) -> Result<Justification, String> {
-    // We determine the justification by the first three tokens
-    match (toks.get(0), toks.get(1), toks.get(2), toks.get(3)) {
+
+fn parse_justification_tokens(toks: &[LToken]) -> Result<Justification, Diagnostic> {
+    fn token_at(toks: &[LToken], index: usize) -> Option<&Token> {
+        return toks.get(index).map(WithLoc::value)
+    }
+
+    fn start_loc(toks: &[LToken]) -> Option<Location> {
+        return toks.get(0).map(|t| t.location().clone());
+    }
+
+    // We determine the justification (and whether it is syntactically valid) by the first four tokens
+    match (token_at(toks, 0),
+           token_at(toks, 1),
+           token_at(toks, 2),
+           token_at(toks, 3)) {
         // "Reit" ":" <num>
         (Some(Token::Name(name)), Some(Token::Colon), Some(Token::Number(num)), None)
             if name == "Reit" => {
@@ -716,21 +805,28 @@ fn parse_justification_tokens(toks: &[Token]) -> Result<Justification, String> {
             if name == "Intro" =>
         {
             let err_str = "failed to parse ∧Intro justification. It should be of this form: ∧Intro:<num>,<num>{,<num>}".to_string();
+            
             let mut nums: Vec<usize> = vec![*num];
             let mut i = 4;
-            while toks.get(i).is_some() {
-                if toks[i] == Token::Comma {
-                    if let Some(Token::Number(next_num)) = toks.get(i + 1) {
+            while token_at(toks,i).is_some() {
+                if matches!(token_at(toks,i), Some(Token::Comma))  {
+                    if let Some(Token::Number(next_num)) = token_at(toks, i + 1) {
                         nums.push(*next_num);
                     } else {
-                        return Err(err_str);
+                        return Err(Diagnostic {
+                            message: err_str,
+                            location: start_loc(toks)
+                        });
                     }
                 } else {
-                    return Err(err_str);
+                    return Err(Diagnostic {
+                        message: err_str,
+                        location: start_loc(toks)
+                    });
                 }
                 i += 2;
             }
-            Ok(Justification::AndIntro(nums))
+            return Ok(Justification::AndIntro(nums))
         }
         // "∧" "Elim" ":" <num>
         (Some(Token::And), Some(Token::Name(name)), Some(Token::Colon), Some(Token::Number(num)))
@@ -739,8 +835,10 @@ fn parse_justification_tokens(toks: &[Token]) -> Result<Justification, String> {
             if toks.get(4).is_none() {
                 Ok(Justification::AndElim(*num))
             } else {
-                Err("failed to parse ∧Elim justification. It should be of this form: ∧Elim:<num>"
-                    .to_string())
+                return Err(Diagnostic {
+                    message: "failed to parse ∧Elim justification. It should be of this form: ∧Elim:<num>".to_string(),
+                    location: start_loc(toks)
+                })
             }
         }
         // "∨" "Intro" : <num>
@@ -748,10 +846,12 @@ fn parse_justification_tokens(toks: &[Token]) -> Result<Justification, String> {
             if name == "Intro" =>
         {
             if toks.get(4).is_none() {
-                Ok(Justification::OrIntro(*num))
+                return Ok(Justification::OrIntro(*num))
             } else {
-                Err("failed to parse ∨Intro justification. It should be of this form: ∨Intro:<num>"
-                    .to_string())
+                return Err(Diagnostic {
+                    message: "failed to parse ∨Intro justification. It should be of this form: ∨Intro:<num>".to_string(),
+                    location: start_loc(toks)
+                })
             }
         }
         // "∨" "Elim" : <num> , <num>-<num> { , <num>-<num> }
@@ -763,27 +863,27 @@ fn parse_justification_tokens(toks: &[Token]) -> Result<Justification, String> {
             let mut i = 4;
             if toks.get(i).is_none() {
                 // should be at least one num-range provided
-                return Err(err_str);
+                return Err(Diagnostic {message: err_str, location: start_loc(toks) });
             };
             while toks.get(i).is_some() {
-                if toks[i] == Token::Comma {
+                if token_at(toks, i).unwrap() == &Token::Comma {
                     if toks.get(i + 1).is_none()
                         || toks.get(i + 2).is_none()
                         || toks.get(i + 3).is_none()
                     {
-                        return Err(err_str);
+                        return Err(Diagnostic {message: err_str, location: start_loc(toks) });
                     }
-                    if let (Token::Number(next_num1), Token::Dash, Token::Number(next_num2)) = (
-                        toks.get(i + 1).unwrap(),
-                        toks.get(i + 2).unwrap(),
-                        toks.get(i + 3).unwrap(),
+                    if let (Some(Token::Number(next_num1)), Some(Token::Dash), Some(Token::Number(next_num2))) = (
+                        token_at(toks, i + 1),
+                        token_at(toks, i + 2),
+                        token_at(toks, i + 3)
                     ) {
                         num_pairs.push((*next_num1, *next_num2));
                     } else {
-                        return Err(err_str);
+                        return Err(Diagnostic {message: err_str, location: start_loc(toks) });
                     }
                 } else {
-                    return Err(err_str);
+                    return Err(Diagnostic {message: err_str, location: start_loc(toks) });
                 }
                 i += 4;
             }
@@ -795,13 +895,13 @@ fn parse_justification_tokens(toks: &[Token]) -> Result<Justification, String> {
         {
             let err_str = "failed to parse →Intro justification. It should be of this form: →Intro:<num>-<num>".to_string();
             if toks.len() != 6 {
-                return Err(err_str);
+                return Err(Diagnostic {message: err_str, location: start_loc(toks) });
             }
-            if let (Token::Dash, Token::Number(num2)) = (toks.get(4).unwrap(), toks.get(5).unwrap())
+            if let (Token::Dash, Token::Number(num2)) = (token_at(toks, 4).unwrap(), token_at(toks, 5).unwrap())
             {
                 Ok(Justification::ImpliesIntro((*num1, *num2)))
             } else {
-                Err(err_str)
+                return Err(Diagnostic {message: err_str, location: start_loc(toks) });
             }
         }
         // → "Elim" : <num>, <num>
@@ -812,13 +912,13 @@ fn parse_justification_tokens(toks: &[Token]) -> Result<Justification, String> {
                 "failed to parse →Elim justification. It should be of this form: →Elim:<num>,<num>"
                     .to_string();
             if toks.len() != 6 {
-                return Err(err_str)
+                return Err(Diagnostic {message: err_str, location: start_loc(toks) });
             }
-            if let (Token::Comma, Token::Number(num2)) = (toks.get(4).unwrap(), toks.get(5).unwrap())
+            if let (Token::Comma, Token::Number(num2)) = (token_at(toks, 4).unwrap(), token_at(toks, 5).unwrap())
             {
-                Ok(Justification::ImpliesElim(*num1, *num2))
+                return Ok(Justification::ImpliesElim(*num1, *num2))
             } else {
-                Err(err_str)
+                return Err(Diagnostic {message: err_str, location: start_loc(toks) });
             }
         }
         // ↔ "Intro" : <num>-<num>, <num>-<num>
@@ -827,13 +927,14 @@ fn parse_justification_tokens(toks: &[Token]) -> Result<Justification, String> {
         {
             let err_str = "failed to parse ↔Intro justification. It should be of this form: ↔Intro:<num>-<num>,<num>-<num>".to_string();
             if toks.len() != 10 {
-                Err(err_str)
-            } else if let [Token::Dash, Token::Number(num2), Token::Comma, Token::Number(num3), Token::Dash, Token::Number(num4)] =
-                &toks[4..10]
+                return Err(Diagnostic {message: err_str, location: start_loc(toks) });
+            } else if let (Token::Dash, Token::Number(num2), Token::Comma, Token::Number(num3), Token::Dash, Token::Number(num4)) =
+                  (token_at(toks, 4).unwrap(), token_at(toks, 5).unwrap(), token_at(toks, 6).unwrap(),
+                   token_at(toks, 7).unwrap(), token_at(toks, 8).unwrap(), token_at(toks, 9).unwrap())
             {
                 Ok(Justification::BicondIntro((*num1, *num2), (*num3, *num4)))
             } else {
-                Err(err_str)
+                return Err(Diagnostic {message: err_str, location: start_loc(toks) });
             }
         }
         // ↔ "Intro" : <num>,<num>
@@ -844,11 +945,11 @@ fn parse_justification_tokens(toks: &[Token]) -> Result<Justification, String> {
                 "failed to parse ↔Elim justification. It should be of this form: ↔Elim:<num>,<num>"
                     .to_string();
             if toks.len() != 6 {
-                Err(err_str)
-            } else if let (Token::Comma, Token::Number(num2)) = (&toks[4], &toks[5]) {
-                Ok(Justification::BicondElim(*num1, *num2))
+                return Err(Diagnostic {message: err_str, location: start_loc(toks) });
+            } else if let (Token::Comma, Token::Number(num2)) = (token_at(toks,4).unwrap(), token_at(toks,5).unwrap()) {
+                return Ok(Justification::BicondElim(*num1, *num2))
             } else {
-                Err(err_str)
+                return Err(Diagnostic {message: err_str, location: start_loc(toks) });
             }
         }
         // ¬ "Intro" : <num>-<num>
@@ -857,22 +958,22 @@ fn parse_justification_tokens(toks: &[Token]) -> Result<Justification, String> {
         {
             let err_str = "failed to parse ¬Intro justification. It should be of this form: ¬Intro:<num>-<num>".to_string();
             if toks.len() != 6 {
-                Err(err_str)
-            } else if let (Token::Dash, Token::Number(num2)) = (&toks[4], &toks[5]) {
+                return Err(Diagnostic {message: err_str, location: start_loc(toks) });
+            } else if let (Token::Dash, Token::Number(num2)) = (token_at(toks, 4).unwrap(), token_at(toks, 5).unwrap()) {
                 Ok(Justification::NotIntro((*num1, *num2)))
             } else {
-                Err(err_str)
+                return Err(Diagnostic {message: err_str, location: start_loc(toks) });
             }
         }
         // ¬ "Elim" : <num>,<num>
         (Some(Token::Not), Some(Token::Name(name)), Some(Token::Colon), Some(Token::Number(num)))
             if name == "Elim" =>
         {
+            let err_str = "failed to parse ¬Elim justification. It should be of this form: ¬Elim:<num>".to_string();
             if toks.get(4).is_none() {
-                Ok(Justification::NotElim(*num))
+                return Ok(Justification::NotElim(*num))
             } else {
-                Err("failed to parse ¬Elim justification. It should be of this form: ¬Elim:<num>"
-                    .to_string())
+                return Err(Diagnostic {message: err_str, location: start_loc(toks) });
             }
         }
         // ⊥ "Intro" : <num>,<num>
@@ -881,32 +982,34 @@ fn parse_justification_tokens(toks: &[Token]) -> Result<Justification, String> {
         {
             let err_str = "failed to parse ⊥Intro justification. It should be of this form: ⊥Intro:<num>,<num>".to_string();
             if toks.len() != 6 {
-                Err(err_str)
-            } else if let (Token::Comma, Token::Number(num2)) = (&toks[4], &toks[5]) {
+                Err(Diagnostic {message: err_str, location: start_loc(toks) })
+            } else if let (Token::Comma, Token::Number(num2))
+                = (token_at(toks, 4).unwrap(), token_at(toks, 5).unwrap()) {
                 Ok(Justification::BottomIntro(*num1, *num2))
             } else {
-                Err(err_str)
+                Err(Diagnostic {message: err_str, location: start_loc(toks) })
             }
         }
         // ⊥ "Elim" : <num>
         (Some(Token::Bottom), Some(Token::Name(name)), Some(Token::Colon), Some(Token::Number(num)))
             if name == "Elim" =>
         {
+            let err_str = "failed to parse ⊥Elim justification. It should be of this form: ⊥Elim:<num>".to_string();
             if toks.get(4).is_none() {
                 Ok(Justification::BottomElim(*num))
             } else {
-                Err("failed to parse ⊥Elim justification. It should be of this form: ⊥Elim:<num>"
-                    .to_string())
+                Err(Diagnostic {message: err_str, location: start_loc(toks) })
             }
         }
         // = "Intro"
         (Some(Token::Equals), Some(Token::Name(name)), ..)
             if name == "Intro" =>
         {
+            let err_str = "failed to parse =Intro justification. This proof rule goes without colon and without line references, so all you write is just \'=Intro\'".to_string();
              if toks.len() == 2 {
                 Ok(Justification::EqualsIntro)
             } else {
-                Err("failed to parse =Intro justification. This proof rule goes without colon and without line references, so all you write is just \'=Intro\'".to_string())
+                Err(Diagnostic {message: err_str, location: start_loc(toks) })
             }
         }
         // = "Elim": <num>,<num>
@@ -915,13 +1018,13 @@ fn parse_justification_tokens(toks: &[Token]) -> Result<Justification, String> {
         {
             let err_str = "failed to parse =Elim justification. It should be of this form: =Elim:<num>,<num>".to_string();
             if toks.len() != 6 {
-                Err(err_str)
+                Err(Diagnostic {message: err_str, location: start_loc(toks) })
             } else if let (Token::Comma, Token::Number(num2)) =
-                (toks.get(4).unwrap(), toks.get(5).unwrap())
+                (token_at(toks, 4).unwrap(), token_at(toks, 5).unwrap())
             {
                 Ok(Justification::EqualsElim(*num1, *num2))
             } else {
-                Err(err_str)
+                Err(Diagnostic {message: err_str, location: start_loc(toks) })
             }
         }
         // ∀ "Intro" : <num> - <num> 
@@ -930,35 +1033,35 @@ fn parse_justification_tokens(toks: &[Token]) -> Result<Justification, String> {
         {
             let err_str = "failed to parse ∀Intro justification. It should be of this form: ∀Intro:<num>-<num>".to_string();
             if toks.len() != 6 {
-                Err(err_str)
+                Err(Diagnostic {message: err_str, location: start_loc(toks) })
             } else if let (Token::Dash, Token::Number(num2)) =
-                (toks.get(4).unwrap(), toks.get(5).unwrap())
+                (token_at(toks, 4).unwrap(), token_at(toks, 5).unwrap())
             {
                 Ok(Justification::ForallIntro((*num1, *num2)))
             } else {
-                Err(err_str)
+                Err(Diagnostic {message: err_str, location: start_loc(toks) })
             }
         }
         // ∀ "Elim" : <num>
         (Some(Token::Forall), Some(Token::Name(name)), Some(Token::Colon), Some(Token::Number(num)))
-            if name == "Elim" && toks.get(4).is_none() =>
+            if name == "Elim" && token_at(toks, 4).is_none() =>
         {
-            if toks.get(4).is_none() {
+            let err_str = "failed to parse ∀Elim justification. It should be of this form: ∀Elim:<num>".to_string();
+            if token_at(toks, 4).is_none() {
                 Ok(Justification::ForallElim(*num))
             } else {
-                Err("failed to parse ∀Elim justification. It should be of this form: ∀Elim:<num>"
-                    .to_string())
+                Err(Diagnostic {message: err_str, location: start_loc(toks) })
             }
         }
         // ∃ "Intro" : <num>
         (Some(Token::Exists), Some(Token::Name(name)), Some(Token::Colon), Some(Token::Number(num)))
-            if name == "Intro" && toks.get(4).is_none() =>
+            if name == "Intro" && token_at(toks, 4).is_none() =>
         {
-            if toks.get(4).is_none() {
+            let err_str = "failed to parse ∃Intro justification. It should be of this form: ∃Intro:<num>".to_string();
+            if token_at(toks, 4).is_none() {
                 Ok(Justification::ExistsIntro(*num))
             } else {
-                Err("failed to parse ∃Intro justification. It should be of this form: ∃Intro:<num>"
-                    .to_string())
+                Err(Diagnostic {message: err_str, location: start_loc(toks) })
             }
         }
         // ∃ "Elim" : <num>, <num> - <num>         
@@ -967,25 +1070,48 @@ fn parse_justification_tokens(toks: &[Token]) -> Result<Justification, String> {
         {
             let err_str = "failed to parse ∃Elim justification. It should be of this form: ∃Elim:<num>,<num>-<num>".to_string();
             if toks.len() != 8 {
-                Err(err_str)
+                Err(Diagnostic {message: err_str, location: start_loc(toks) })
             } else if let (Token::Comma, Token::Number(num2), Token::Dash, Token::Number(num3)) = (
-                toks.get(4).unwrap(),
-                toks.get(5).unwrap(),
-                toks.get(6).unwrap(),
-                toks.get(7).unwrap(),
+                token_at(toks, 4).unwrap(),
+                token_at(toks, 5).unwrap(),
+                token_at(toks, 6).unwrap(),
+                token_at(toks, 7).unwrap(),
             ) {
                 Ok(Justification::ExistsElim(*num1, (*num2, *num3)))
             } else {
-                Err(err_str)
+                Err(Diagnostic {message: err_str, location: start_loc(toks) })
             }
         }
-        _ => Err("failed to parse justification. Make sure that you have references where necessary, and note that the proper capitalization is \'Intro\'/\'Elim\'/\'Reit\'.".to_string()),
+        _ =>
+            Err(Diagnostic {
+                message:
+                "failed to parse justification. Make sure that you have references where necessary, and note that the proper capitalization is \'Intro\'/\'Elim\'/\'Reit\'.".to_string(),
+                location: start_loc(toks)
+            })
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn proof_lexer_diagnostic_has_physical_location() {
+        let diagnostic = parse_fitch_proof_diagnostic("\n1 | P\n2 | P @ Reit:1").unwrap_err();
+
+        assert_eq!(diagnostic.location, Some(Location::new(None, 3, 7)));
+        assert_eq!(diagnostic.message, "lexer failure near line 2: invalid character found: @");
+        assert_eq!(parse_fitch_proof("\n1 | P\n2 | P @ Reit:1").unwrap_err(), diagnostic.message);
+    }
+
+    #[test]
+    fn proof_parser_diagnostic_uses_first_token_location() {
+        let diagnostic = parse_fitch_proof_diagnostic("\n1 | P(").unwrap_err();
+
+        assert_eq!(diagnostic.location, Some(Location::new(None, 2, 5)));
+        assert_eq!(parse_fitch_proof("\n1 | P(").unwrap_err(), diagnostic.message);
+    }
+
     #[test]
     fn test_lexer_1() {
         assert_eq!(
@@ -1079,7 +1205,10 @@ mod tests {
     }
 
     fn lex_tokens(input: &str) -> Result<Vec<Token>, String> {
-        lex(input).map(|toks| toks.into_iter().map(|t| t.value().clone()).collect())
+        lex(input)
+            .map(|toks| toks.into_iter().map(|t| t.value().clone()).collect())
+            .map_err(|d| d.message)
+            
     }
 
     fn lwff(wff: Wff) -> LWff {
@@ -1112,12 +1241,14 @@ mod tests {
         let sanitized = match value {
             Wff::And(children) => Wff::And(children.into_iter().map(strip_wff_locations).collect()),
             Wff::Or(children) => Wff::Or(children.into_iter().map(strip_wff_locations).collect()),
-            Wff::Implies(lhs, rhs) => {
-                Wff::Implies(Box::new(strip_wff_locations(*lhs)), Box::new(strip_wff_locations(*rhs)))
-            }
-            Wff::Bicond(lhs, rhs) => {
-                Wff::Bicond(Box::new(strip_wff_locations(*lhs)), Box::new(strip_wff_locations(*rhs)))
-            }
+            Wff::Implies(lhs, rhs) => Wff::Implies(
+                Box::new(strip_wff_locations(*lhs)),
+                Box::new(strip_wff_locations(*rhs)),
+            ),
+            Wff::Bicond(lhs, rhs) => Wff::Bicond(
+                Box::new(strip_wff_locations(*lhs)),
+                Box::new(strip_wff_locations(*rhs)),
+            ),
             Wff::Not(inner) => Wff::Not(Box::new(strip_wff_locations(*inner))),
             Wff::Bottom => Wff::Bottom,
             Wff::Forall(var, body) => Wff::Forall(var, Box::new(strip_wff_locations(*body))),
@@ -1163,17 +1294,14 @@ mod tests {
     }
 
     fn pred(name: &str, args: Vec<Term>) -> LWff {
-        lwff(Wff::PredApp(
-            name.to_string(),
-            args.into_iter().map(lterm).collect(),
-        ))
+        lwff(Wff::PredApp(name.to_string(), args.into_iter().map(lterm).collect()))
     }
 
     fn eq_terms(left: Term, right: Term) -> LWff {
         lwff(Wff::Equals(lterm(left), lterm(right)))
     }
 
-    fn parse_justification_text(input: &str) -> Result<Justification, String> {
+    fn parse_justification_text(input: &str) -> Result<Justification, Diagnostic> {
         parse_justification(&lex(input).unwrap()).map(|j| j.value().clone())
     }
 

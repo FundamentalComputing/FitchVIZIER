@@ -280,13 +280,36 @@ impl Justification {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Diagnostic {
+    pub message: String,
+    pub location: Option<Location>,
+}
+
+impl AsRef<str> for Diagnostic {
+    fn as_ref(&self) -> &str {
+        &self.message
+    }
+}
+
+impl Diagnostic {
+    pub fn format(self : &Diagnostic) -> String {
+        match &self.location  {
+            None => self.message.clone(),
+            Some(loc) =>
+                format!("line {}:{}: {}", loc.line, loc.column, self.message)
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ProofResult {
     /// No mistakes; proof is correct.
     Correct,
     /// An 'error' is a mistake that makes the proof wrong, but still allows
     /// the checker to go on and find other mistakes. This [ProofResult::Error]
     /// variant denotes the list of errors that was obtained during analysis.
-    Error(Vec<String>),
+    Error(Vec<Diagnostic>),
     /// A mistake that is so severe that the checker cannot continue its analysis.
     /// When a fatal error occurs, this fatal error will be returned to the user,
     /// with no other error messages along it.
@@ -294,5 +317,5 @@ pub enum ProofResult {
     /// Note that when the user checks some proof that should match to some proof template,
     /// a [ProofResult::FatalError] will be returned if the proof does
     /// not match the template.
-    FatalError(String),
+    FatalError(Diagnostic),
 }

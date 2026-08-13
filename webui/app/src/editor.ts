@@ -2,7 +2,6 @@ import * as monaco from "monaco-editor";
 import Alpine from "alpinejs";
 import {
   findNumberedLineUp,
-  getEditorLineNumber,
   getLineByMonacoNumber,
   getLineDepth,
   getLineType,
@@ -11,7 +10,7 @@ import {
 } from "./helpers";
 import { saveToLocalStorage } from "./persistence";
 import {
-  check_proof,
+  check_proof_diagnostics,
   format_proof,
   fix_line_numbers_in_proof
 } from "@workspace/library";
@@ -177,7 +176,6 @@ export function process_user_input() {
     editor.setModel(monaco.editor.getModels()[Alpine.store("tabs").current]);
     model = editor.getModel();
   };
-  const editorValue = editor.getValue();
   replace_words_by_fancy_symbols();
 
   const allowedVariableNamesField = document.getElementById("allowed-variable-names");
@@ -185,32 +183,35 @@ export function process_user_input() {
     throw new Error(`allowed variable names field is of wrong node type`);
   }
 
-  const res = check_proof(editor.getValue(), allowedVariableNamesField.value);
-  if (res.startsWith("The proof is correct!")) {
+  const result = check_proof_diagnostics(editor.getValue(), allowedVariableNamesField.value);
+  const res = result.status === "correct"
+    ? "The proof is correct!"
+    : result.diagnostics.map(({ message }) => message).join("\n\n");
+  if (result.status === "correct") {
     document.getElementById("feedback").style.background = "green";
-  } else if (res.startsWith("Fatal error")) {
+  } else if (result.status === "fatal") {
     document.getElementById("feedback").style.background = "red";
   } else {
     document.getElementById("feedback").style.background = "#f05a1f";
   }
-  document.getElementById("feedback").innerText = res;
-  const matches = res.match(/(?:line\s+)(\d+)/i);
-  if (matches) {
-    const editorLine = getEditorLineNumber(editorValue, Number(matches[1]));
-    const markers: monaco.editor.IMarkerData[] = [
-      {
-        message: res,
+  document.getElementById("feedback").innerText =
+    result.status === "fatal" ? `Fatal error: ${res}` : res;
+  const markers: monaco.editor.IMarkerData[] = result.diagnostics
+    .filter(({ location }) => location !== null)
+    .map(({ message, location }) => {
+      const lineNumber = location!.line;
+      const colNumber = location!.column;
+      console.log(colNumber);
+      return {
+        message,
         severity: monaco.MarkerSeverity.Error,
-        startLineNumber: editorLine,
-        startColumn: 1,
-        endLineNumber: editorLine,
-        endColumn: 100,
-      },
-    ];
-    monaco.editor.setModelMarkers(model, "owner", markers);
-  } else {
-    monaco.editor.setModelMarkers(model, "owner", []);
-  }
+        startLineNumber: lineNumber,
+        startColumn: colNumber,
+        endLineNumber: lineNumber,
+        endColumn: model.getLineMaxColumn(lineNumber),
+      };
+    });
+  monaco.editor.setModelMarkers(model, "owner", markers);
 
 }
 

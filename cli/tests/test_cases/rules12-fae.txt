@@ -1,0 +1,6 @@
+1 | ∀x ∀y P(x,y)
+  |----
+2 | ∀y P(a,y)            ∀ Elim: 1
+3 | ∀x P(x,y)            ∀ Elim: 1
+4 | ∀x P(a,x)            ∀ Elim: 1
+5 | ∀y P(x,y)            ∀ Elim: 1

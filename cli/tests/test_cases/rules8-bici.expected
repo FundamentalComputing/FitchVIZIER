@@ -1,5 +1,5 @@
-Line 8: when using ↔Intro to infer P↔Q, you must first cite the subproof that proves P→Q, and then the subproof that proves Q→P.
+line 12:1: Line 8: when using ↔Intro to infer P↔Q, you must first cite the subproof that proves P→Q, and then the subproof that proves Q→P.
 
-Line 9: when using ↔Intro to infer P↔Q, you must first cite the subproof that proves P→Q, and then the subproof that proves Q→P.
+line 13:1: Line 9: when using ↔Intro to infer P↔Q, you must first cite the subproof that proves P→Q, and then the subproof that proves Q→P.
 
-Line 10: ↔Intro is used, but the top-level connective of this sentence is not a bi-implication.
+line 14:1: Line 10: ↔Intro is used, but the top-level connective of this sentence is not a bi-implication.

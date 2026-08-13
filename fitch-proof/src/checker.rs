@@ -1,5 +1,6 @@
 use crate::data::*;
 use crate::formatter;
+use crate::loc::WithLoc;
 use crate::proof::*;
 use crate::util;
 use std::collections::{HashMap, HashSet};
@@ -18,7 +19,7 @@ pub fn check_proof(
     allowed_variable_names: HashSet<String>,
 ) -> ProofResult {
     match Proof::construct(proof_nodes, allowed_variable_names) {
-        Err(err) => ProofResult::FatalError(err),
+        Err(diagnostic) => ProofResult::FatalError(diagnostic),
         Ok(proof) => proof.is_fully_correct(),
     }
 }
@@ -42,7 +43,7 @@ pub fn check_proof_with_template(
     allowed_variable_names: HashSet<String>,
 ) -> ProofResult {
     match Proof::construct(proof_nodes, allowed_variable_names) {
-        Err(err) => ProofResult::FatalError(err),
+        Err(diagnostic) => ProofResult::FatalError(diagnostic),
         Ok(proof) => proof.is_fully_correct_and_matches_template(template),
     }
 }
@@ -61,30 +62,51 @@ impl Proof {
         // Note: don't remove this check on the length of `template`. It would cause some panics
         // below if the length is zero.
         if template.is_empty() {
-            return ProofResult::FatalError("The proof template is empty. This should not be! If you see this on Themis as a student, please contact the course staff as soon as possible. Something is wrong on our side. Thanks!".to_owned());
+            return ProofResult::FatalError(Diagnostic {
+                message: "The proof template is empty. This should not be! If you see this on Themis as a student, please contact the course staff as soon as possible. Something is wrong on our side. Thanks!".to_owned(),
+                location: None,
+            });
         }
 
         // template matching errors that we will be accumulating.
-        let mut template_errors: Vec<String> = vec![];
+        let mut template_errors: Vec<Diagnostic> = vec![];
 
         // check premises
         {
-            let premises_in_proof: Vec<Wff> = self
-                .nodes
-                .iter()
-                .take_while(|node| !node.is_fitch_bar())
-                .filter_map(|node| match node.value() {
-                    ProofNode::Numbered(line) => line.sentence().cloned(),
-                    _ => None,
-                })
-                .collect();
+            let mut premises_in_proof =
+                self.nodes.iter().take_while(|node| !node.is_fitch_bar()).filter_map(|node| {
+                    match node.value() {
+                        ProofNode::Numbered(line) => {
+                            line.sentence().map(|sentence| (sentence, node.location()))
+                        }
+                        _ => None,
+                    }
+                });
+            // safe because template is non-empty
+            let mut premises_in_template = template[..template.len() - 1].iter();
 
-            // index is within bounds
-            if premises_in_proof != template[0..template.len() - 1] {
-                template_errors.push(
-                    "The premises of your proof do not match the premises in the proof template."
+            let first_mismatch = loop {
+                match (premises_in_proof.next(), premises_in_template.next()) {
+                    (Some((actual, _)), Some(expected)) if actual == expected => continue,
+                    (Some((_, location)), _) => break Some(location.clone()),
+                    (None, Some(_)) => {
+                        // return the location of the fitch bar if the premises are exhaused
+                        break self
+                            .nodes
+                            .iter()
+                            .find(|node| node.is_fitch_bar())
+                            .map(|node| node.location.clone());
+                    }
+                    (None, None) => break None,
+                }
+            };
+
+            if let Some(location) = first_mismatch {
+                template_errors.push(Diagnostic {
+                    message: "The premises of your proof do not match the premises in the proof template."
                         .to_owned(),
-                );
+                    location: Some(location),
+                });
             }
         }
 
@@ -96,13 +118,20 @@ impl Proof {
             });
             match conclusion_in_proof {
                 None => {
-                    template_errors
-                        .push("It seems that your proof has no sentences in it.".to_owned());
+                    template_errors.push(Diagnostic {
+                        message: "It seems that your proof has no sentences in it.".to_owned(),
+                        location: None,
+                    });
                 }
                 Some(concl) => {
                     // both unwraps work (note that we checked the length of `template`)
                     if concl != template.last().unwrap() {
-                        template_errors.push("The conclusion of your proof does not match the conclusion in the proof template.".to_owned());
+                        template_errors.push(Diagnostic {
+                            message: "The conclusion of your proof does not match the conclusion in the proof template.".to_owned(),
+                            location: self
+                                .last_numbered_node()
+                                .map(|node| node.location.clone()),
+                        });
                     }
                 }
             }
@@ -133,12 +162,17 @@ impl Proof {
     ///
     /// When you want to fully assess the validity of a proof, you should first [Proof::construct] the proof, and then run this function.
     fn is_fully_correct(&self) -> ProofResult {
-        let mut errors: Vec<String> = vec![]; // here we accumulate all errors
+        let mut errors: Vec<Diagnostic> = vec![]; // here we accumulate all errors
 
         // check that user applied proof rule correctly everywhere
-        for line in self.numbered_lines() {
-            if let Err(err) = self.check_line(line) {
-                errors.push(err.to_string());
+        for node in self.nodes() {
+            if let ProofNode::Numbered(line) = node.value() {
+                if let Err(message) = self.check_line(line) {
+                    errors.push(Diagnostic {
+                        message,
+                        location: Some(node.location.clone()),
+                    });
+                }
             }
         }
 
@@ -163,36 +197,52 @@ impl Proof {
             }
         }
         if !seen_fitch_bar || !premises_ok {
-            errors.push(
-                "Each proof should start start with zero or more premises, followed by a Fitch bar"
+            errors.push(Diagnostic {
+                message: "Each proof should start start with zero or more premises, followed by a Fitch bar"
                     .to_string(),
-            );
+                // TODO: more precise error location
+                location: None,
+            });
         }
 
         // check that all inferences have justification
-        errors.extend(
-            self.line_numbers_missing_justification()
-                .iter()
-                .map(|n| format!("Line {n}: missing justification").to_string()),
-        );
+        errors.extend(self.lines_missing_justification().into_iter().map(|line_num| Diagnostic {
+            message: format!("Line {}: missing justification", line_num.value()),
+            location: Some(line_num.location),
+        }));
 
         // check that all variables are bound, that user doesn't have nested quantifiers over the
         // same variable and that users don't quantify over a constant, and that the user does not make
         // a function with the name of a variable
-        errors.extend(self.numbered_lines().filter_map(|line| match line.sentence() {
-            None => None,
-            Some(wff) => self.check_variable_scoping_naming_issues(wff, line.line_num).err(),
+        errors.extend(self.nodes().iter().filter_map(|node| {
+            let ProofNode::Numbered(line) = node.value() else {
+                return None;
+            };
+            line.sentence().and_then(|wff| {
+                self.check_variable_scoping_naming_issues(wff, line.line_num).err().map(|message| {
+                    Diagnostic {
+                        message,
+                        location: Some(node.location.clone()),
+                    }
+                })
+            })
         }));
 
         // check that user does not use a symbol to denote both a constant and a function, and that
         // arities of function symbols are consistent throughout the proof.
-        errors.extend(self.generate_arity_errors());
+        errors.extend(self.generate_arity_errors().into_iter().map(|message| Diagnostic {
+            message,
+            location: None,
+        }));
 
         // check that user doesn't use boxed constant outside the subproof and that user does not
         // introduce the same boxed constant twice in nested subproofs, and that boxed constants
         // are actually constants (not variables or predicates or ...)
         if let Err(errs) = self.check_boxed_constant_outside_subproof() {
-            errors.extend(errs);
+            errors.extend(errs.into_iter().map(|message| Diagnostic {
+                message,
+                location: None,
+            }));
         }
 
         // check that last line is top-level
@@ -200,7 +250,10 @@ impl Proof {
             // if the proof is empty the check above returns false
             // so it is safe to unwrap the last_line_num
             let lln = self.last_line_num().unwrap();
-            errors.push(format!("Line {lln}: last line of proof should not be inside subproof"));
+            errors.push(Diagnostic {
+                message: format!("Line {lln}: last line of proof should not be inside subproof"),
+                location: self.last_numbered_node().map(|node| node.location.clone()),
+            });
         }
 
         if errors.is_empty() {
@@ -211,10 +264,10 @@ impl Proof {
         }
     }
 
-    /// This function returns a vector containing all line numbers which correspond to "premises"
+    /// This function returns the located line numbers corresponding to "premises"
     /// that are found between a Fitch bar line and a SubproofOpen.
     /// (these would be the inferences with missing justification, but they are parsed as premises)
-    fn line_numbers_missing_justification(&self) -> Vec<usize> {
+    fn lines_missing_justification(&self) -> Vec<WithLoc<usize>> {
         let mut res = vec![]; // store what we're going to return
         let mut expect_justification = false;
         for node in self.nodes() {
@@ -237,7 +290,7 @@ impl Proof {
                 } => {}
                 ProofNode::Numbered(line) => {
                     if expect_justification && !line.is_inference() {
-                        res.push(line.line_num);
+                        res.push(WithLoc::new(line.line_num, node.location.clone()));
                     }
                 }
             }

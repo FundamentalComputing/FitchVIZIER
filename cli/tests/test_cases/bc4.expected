@@ -1,1 +1,1 @@
-Fatal error: parser failure near line 3: a boxed constant must be a constant; it should start with a lowercase letter
+line 5:10: Fatal error: parser failure near line 3: a boxed constant must be a constant; it should start with a lowercase letter

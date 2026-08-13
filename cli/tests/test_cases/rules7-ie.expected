@@ -1,7 +1,7 @@
-Line 4: the rule →Elim is wrongly used.
+line 5:1: Line 4: the rule →Elim is wrongly used.
 
-Line 5: the rule →Elim: 3, 3 is used, but the top-level connective of line 3 is not an implication.
+line 6:1: Line 5: the rule →Elim: 3, 3 is used, but the top-level connective of line 3 is not an implication.
 
-Line 6: the rule →Elim is wrongly used.
+line 7:1: Line 6: the rule →Elim is wrongly used.
 
-Line 8: the rule →Elim is wrongly used.
+line 9:1: Line 8: the rule →Elim is wrongly used.

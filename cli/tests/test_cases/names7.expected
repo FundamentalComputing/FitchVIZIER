@@ -2,4 +2,4 @@ Error: it seems like 'P' is meant to denote a predicate, but throughout the proo
 
 Error: it seems like you use the name 'Q' both to denote a nullary predicate ('no inputs'), and to denote a non-nullary predicate
 
-Line 7: the referenced subproof 6-4 is not in the scope of line 7, or it does not exist.
+line 9:1: Line 7: the referenced subproof 6-4 is not in the scope of line 7, or it does not exist.

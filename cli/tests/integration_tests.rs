@@ -120,7 +120,7 @@ fn reuses_template_for_multiple_proofs_2() {
     assert!(output.status.success());
     assert_eq!(
         String::from_utf8_lossy(&output.stdout).trim(),
-        format!("{}\n{}\nThe premises of your proof do not match the premises in the proof template.\n\nThe conclusion of your proof does not match the conclusion in the proof template.", expected.trim(), expected.trim())
+        format!("{}\n{}\nline 1:1: The premises of your proof do not match the premises in the proof template.\n\nline 4:1: The conclusion of your proof does not match the conclusion in the proof template.", expected.trim(), expected.trim())
     );
 }
 

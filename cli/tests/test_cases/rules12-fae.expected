@@ -1,0 +1,7 @@
+line 4:1: Line 3: the rule ∀Elim:1 is used, but there is no appropriate substitution between line 1 and line 3
+
+line 4:1: Line 3: this line contains unbound variables.
+
+line 5:1: Line 4: the rule ∀Elim:1 is used, but there is no appropriate substitution between line 1 and line 4
+
+line 6:1: Line 5: this line contains unbound variables.
