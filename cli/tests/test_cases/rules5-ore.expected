@@ -1,8 +1,8 @@
-Line 2: it is not allowed to use a boxed constant outside the subproof that defines it
+line 2:14: Line 2: it is not allowed to use a boxed constant outside the subproof that defines it
 
-Line 3: it is not allowed to use a boxed constant outside the subproof that defines it
+line 3:7: Line 3: it is not allowed to use a boxed constant outside the subproof that defines it
 
-Line 6: it is not allowed to use a boxed constant outside the subproof that defines it
+line 9:9: Line 6: it is not allowed to use a boxed constant outside the subproof that defines it
 
 line 11:1: Line 7: line 4 is referenced in the justification, but this is not allowed, because line 4 is inside an already closed subproof.
 

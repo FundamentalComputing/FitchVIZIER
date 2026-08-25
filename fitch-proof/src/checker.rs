@@ -237,10 +237,7 @@ impl Proof {
         // introduce the same boxed constant twice in nested subproofs, and that boxed constants
         // are actually constants (not variables or predicates or ...)
         if let Err(errs) = self.check_boxed_constant_outside_subproof() {
-            errors.extend(errs.into_iter().map(|message| Diagnostic {
-                message,
-                location: None,
-            }));
+            errors.extend(errs);
         }
 
         // check that last line is top-level
@@ -310,8 +307,8 @@ impl Proof {
     /// This function checks that no boxed constants are used outside the subproof. If no boxed
     /// constants are used outside the corresponding subproof, `Ok(())` is returned. Otherwise, a
     /// vector or relevant error messages will be returned, wrapped in an `Err`.
-    fn check_boxed_constant_outside_subproof(&self) -> Result<(), Vec<String>> {
-        let mut errors: Vec<String> = vec![];
+    fn check_boxed_constant_outside_subproof(&self) -> Result<(), Vec<Diagnostic>> {
+        let mut errors: Vec<Diagnostic> = vec![];
 
         // step 1: check which boxed constants exist within the proof
         let boxed_consts: HashSet<_> =
@@ -319,16 +316,23 @@ impl Proof {
 
         // step 2: let's also give warnings if the user puts a variable in a box (not a constant)
         errors.extend(
-            self.numbered_lines()
+            self.nodes()
+                .iter()
                 .filter_map(|line| {
-                    line.boxed_constant_owned().and_then(|bc| {
+                    let ProofNode::Numbered(line) = line.value() else {
+                        return None;
+                    };
+                    line.boxed_constant().and_then(|bc| {
                         if self.term_is_constant(bc) {
                             None
                         } else {
-                            Some(format!(
-                                "Line {}: a boxed constant cannot be a variable (should not have the name of a variable).",
-                                line.line_num
-                            ))
+                            Some(Diagnostic {
+                                message: format!(
+                                    "Line {}: a boxed constant cannot be a variable (should not have the name of a variable).",
+                                    line.line_num
+                                ),
+                                location: line.boxed_constant_loc().cloned(),
+                            })
                         }
                     })
                 }),
@@ -359,13 +363,16 @@ impl Proof {
                         "Internal error: introduces_boxed_constant returned true but boxed_constant missing",
                     );
                     if currently_in_scope.iter().filter_map(|opt| opt.as_ref()).any(|t| *t == bc) {
-                        errors.push(format!("Line {}: you cannot introduce the same boxed constant twice in nested subproofs", line.line_num));
+                        errors.push(Diagnostic {
+                            message: format!("Line {}: you cannot introduce the same boxed constant twice in nested subproofs", line.line_num),
+                            location: line.boxed_constant_loc().cloned(),
+                        });
                     }
                     currently_in_scope.push(Some(bc));
                     // if the line introducing a boxed constant also contains a formula
                     // (for example, in ∃Elim), we check that the formula contains only valid
                     // boxed constants in scope
-                    if let Some(wff) = line.sentence() {
+                    if let Some(wff) = line.sentence_with_loc() {
                         if let Err(err) = check_wff_not_contain_out_of_scope_boxed_consts(
                             wff,
                             &currently_in_scope,
@@ -380,7 +387,7 @@ impl Proof {
                     if !line.is_inference() && !line.introduces_boxed_constant() =>
                 {
                     currently_in_scope.push(None);
-                    if let Some(wff) = line.sentence() {
+                    if let Some(wff) = line.sentence_with_loc() {
                         if let Err(err) = check_wff_not_contain_out_of_scope_boxed_consts(
                             wff,
                             &currently_in_scope,
@@ -392,7 +399,7 @@ impl Proof {
                     }
                 }
                 ProofNode::Numbered(line) if line.is_inference() => {
-                    if let Some(wff) = line.sentence() {
+                    if let Some(wff) = line.sentence_with_loc() {
                         if let Err(err) = check_wff_not_contain_out_of_scope_boxed_consts(
                             wff,
                             &currently_in_scope,
@@ -421,23 +428,29 @@ impl Proof {
         // If the inputted Wff contains a *constant* which is in the global set of boxed constants (all_boxeds), but not in
         // the current scope, then return Err. Otherwise Ok.
         fn check_wff_not_contain_out_of_scope_boxed_consts(
-            wff: &Wff,
+            wff: &LWff,
             curr_scope: &[Option<Term>],
             all_boxeds: &HashSet<Term>,
             line_num: usize,
-        ) -> Result<(), String> {
+        ) -> Result<(), Diagnostic> {
             fn check_term_not_contain_out_of_scope_boxed_consts(
-                term: &Term,
+                term: &LTerm,
                 curr_scope: &[Option<Term>],
                 all_boxeds: &HashSet<Term>,
                 line_num: usize,
-            ) -> Result<(), String> {
-                match term {
+            ) -> Result<(), Diagnostic> {
+                match term.value() {
                     Term::Atomic(_) => {
-                        if all_boxeds.contains(term)
-                            && !curr_scope.iter().filter_map(|x| x.as_ref()).any(|t| t == term)
+                        if all_boxeds.contains(term.value())
+                            && !curr_scope
+                                .iter()
+                                .filter_map(|x| x.as_ref())
+                                .any(|t| t == term.value())
                         {
-                            Err(format!("Line {line_num}: it is not allowed to use a boxed constant outside the subproof that defines it"))
+                            Err(Diagnostic {
+                                message: format!("Line {line_num}: it is not allowed to use a boxed constant outside the subproof that defines it"),
+                                location: Some(term.location.clone()),
+                            })
                         } else {
                             Ok(())
                         }
@@ -449,7 +462,7 @@ impl Proof {
                     }),
                 }
             }
-            match wff {
+            match wff.value() {
                 Wff::Bottom => Ok(()),
                 Wff::And(li) | Wff::Or(li) => li.iter().try_for_each(|w| {
                     check_wff_not_contain_out_of_scope_boxed_consts(
@@ -1388,10 +1401,10 @@ impl Proof {
     /// if the provided term is a `Term::FuncApp` (function application), then `false` will be
     /// returned. This function will also return `false` in case the provided [Term] is a variable
     /// instead of a constant.
-    fn term_is_constant(&self, term: Term) -> bool {
+    fn term_is_constant(&self, term: &Term) -> bool {
         match term {
             Term::FuncApp(..) => false,
-            Term::Atomic(str) => !self.allowed_variable_names.contains(&str),
+            Term::Atomic(str) => !self.allowed_variable_names.contains(str),
         }
     }
 

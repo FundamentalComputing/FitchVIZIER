@@ -1,4 +1,4 @@
-Line 3: it is not allowed to use a boxed constant outside the subproof that defines it
+line 4:8: Line 3: it is not allowed to use a boxed constant outside the subproof that defines it
 
 line 4:1: Line 3: →Intro is used, but the top-level connective of the sentence at this line is not an implication.
 
@@ -10,6 +10,6 @@ line 11:1: Line 9: →Intro is used, but the last sentence of the referenced sub
 
 line 12:1: Line 10: →Intro is used, but the premise and last sentence of the referenced subproof do not match the antecedent and the consequent, respectively, of the implication found in line 10.
 
-line 20:7: Line 16: this line contains unbound variables.
+line 20:8: Line 16: this line contains unbound variables.
 
 line 20:1: Line 16: when using →Intro, you cannot reference a subproof that introduces a boxed constant.

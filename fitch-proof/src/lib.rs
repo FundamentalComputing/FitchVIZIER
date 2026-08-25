@@ -361,4 +361,52 @@ mod diagnostic_tests {
 
         assert_eq!(diagnostic.location, Some(Location::new(None, 2, 5)));
     }
+
+    #[test]
+    fn boxed_variable_diagnostic_points_to_the_boxed_term() {
+        let proof = "\n1 | ⊥\n  | ---\n2 | | [x]\n  | | ---\n3 | | ⊥ Reit:1\n4 | ⊥ Reit:1";
+        let ProofResult::Error(diagnostics) =
+            check_proof_diagnostics(proof, default_variable_names!())
+        else {
+            panic!("expected boxed-constant diagnostic");
+        };
+        let diagnostic = diagnostics
+            .iter()
+            .find(|diagnostic| diagnostic.message.starts_with("Line 2: a boxed constant"))
+            .expect("missing boxed-variable diagnostic");
+
+        assert_eq!(diagnostic.location, Some(Location::new(None, 4, 8)));
+    }
+
+    #[test]
+    fn out_of_scope_boxed_constant_diagnostic_points_to_the_use() {
+        let proof = "\n1 | Q\n  | ---\n2 | | [a]\n  | | ---\n3 | | P(a) Reit:1\n4 | P(a)";
+        let ProofResult::Error(diagnostics) =
+            check_proof_diagnostics(proof, default_variable_names!())
+        else {
+            panic!("expected boxed-constant diagnostic");
+        };
+        let diagnostic = diagnostics
+            .iter()
+            .find(|diagnostic| diagnostic.message.starts_with("Line 4: it is not allowed"))
+            .expect("missing out-of-scope boxed-constant diagnostic");
+
+        assert_eq!(diagnostic.location, Some(Location::new(None, 7, 7)));
+    }
+
+    #[test]
+    fn duplicate_boxed_constant_diagnostic_points_to_the_second_declaration() {
+        let proof = "\n1 | P\n  | ---\n2 | | [a]\n  | | ---\n3 | | | [a]\n  | | | ---\n4 | | | P\n5 | | P\n6 | P";
+        let ProofResult::Error(diagnostics) =
+            check_proof_diagnostics(proof, default_variable_names!())
+        else {
+            panic!("expected boxed-constant diagnostic");
+        };
+        let diagnostic = diagnostics
+            .iter()
+            .find(|diagnostic| diagnostic.message.starts_with("Line 3: you cannot introduce"))
+            .expect("missing duplicate boxed-constant diagnostic");
+
+        assert_eq!(diagnostic.location, Some(Location::new(None, 6, 10)));
+    }
 }
