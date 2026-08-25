@@ -1,5 +1,5 @@
 Error: it seems like you use the name 'b' both to denote a constant, and to denote a function symbol
 
-line 1:1: Line 1: this line contains unbound variables.
+line 1:14: Line 1: this line contains unbound variables.
 
-line 2:1: Line 2: you can only quantify over a variable, not over a constant.
+line 2:5: Line 2: you can only quantify over a variable, not over a constant.

@@ -326,4 +326,39 @@ mod diagnostic_tests {
 
         assert_eq!(diagnostic.location, Some(Location::new(None, 3, 1)));
     }
+
+    #[test]
+    fn variable_scoping_diagnostic_points_to_the_offending_term() {
+        let proof = "\n1 | P(x)\n  | ---\n2 | P(x) Reit:1";
+        let ProofResult::Error(diagnostics) =
+            check_proof_diagnostics(proof, default_variable_names!())
+        else {
+            panic!("expected variable-scoping diagnostic");
+        };
+        let diagnostic = diagnostics
+            .iter()
+            .find(|diagnostic| diagnostic.message == "Line 1: this line contains unbound variables.")
+            .expect("missing unbound-variable diagnostic");
+
+        assert_eq!(diagnostic.location, Some(Location::new(None, 2, 7)));
+    }
+
+    #[test]
+    fn quantifier_diagnostic_points_to_the_quantified_formula() {
+        let proof = "\n1 | ∀a P(a)\n  | ---\n2 | ∀a P(a) Reit:1";
+        let ProofResult::Error(diagnostics) =
+            check_proof_diagnostics(proof, default_variable_names!())
+        else {
+            panic!("expected variable-scoping diagnostic");
+        };
+        let diagnostic = diagnostics
+            .iter()
+            .find(|diagnostic| {
+                diagnostic.message
+                    == "Line 1: you can only quantify over a variable, not over a constant."
+            })
+            .expect("missing invalid-quantifier diagnostic");
+
+        assert_eq!(diagnostic.location, Some(Location::new(None, 2, 5)));
+    }
 }

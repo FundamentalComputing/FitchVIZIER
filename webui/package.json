@@ -3,6 +3,7 @@
   "scripts": {
     "build:library": "pnpm --filter library run build",
     "build:app": "pnpm --filter app run build",
-    "build": "pnpm build:library && pnpm build:app"
+    "build": "pnpm build:library && pnpm build:app",
+    "preview": "pnpm --filter app run preview"
   }
 }

@@ -215,17 +215,15 @@ impl Proof {
         // same variable and that users don't quantify over a constant, and that the user does not make
         // a function with the name of a variable
         errors.extend(self.nodes().iter().filter_map(|node| {
+            // only concerned with numbered lines with actual sentences
             let ProofNode::Numbered(line) = node.value() else {
                 return None;
             };
-            line.sentence().and_then(|wff| {
-                self.check_variable_scoping_naming_issues(wff, line.line_num).err().map(|message| {
-                    Diagnostic {
-                        message,
-                        location: Some(node.location.clone()),
-                    }
-                })
-            })
+            line.sentence_with_loc()
+                .and_then(|wff|
+                          self
+                          .check_variable_scoping_naming_issues(wff, line.line_num)
+                          .err())
         }));
 
         // check that user does not use a symbol to denote both a constant and a function, and that
@@ -502,16 +500,16 @@ impl Proof {
     /// `Ok(())` is returned. Otherwise, a relevant error message will be returned.
     fn check_variable_scoping_naming_issues(
         &self,
-        wff: &Wff,
+        wff: &LWff,
         line_num: usize,
-    ) -> Result<(), String> {
+    ) -> Result<(), Diagnostic> {
         fn check_variable_scoping_naming_issues_helper(
             proof: &Proof,
-            wff: &Wff,
+            wff: &LWff,
             line_num: usize,
             bound_vars_in_scope: &mut Vec<String>,
-        ) -> Result<(), String> {
-            match wff {
+        ) -> Result<(), Diagnostic> {
+            match wff.value() {
                 Wff::Bottom => Ok(()),
                 Wff::Atomic(_) => Ok(()),
                 Wff::PredApp(_, args) => args.iter().try_for_each(|a| {
@@ -562,19 +560,25 @@ impl Proof {
                     line_num,
                     bound_vars_in_scope,
                 )),
-                Wff::Forall(var, wff) | Wff::Exists(var, wff) => {
+                Wff::Forall(var, body) | Wff::Exists(var, body) => {
                     if !proof.allowed_variable_names.contains(var) {
-                        Err(format!("Line {line_num}: you can only quantify over a variable, not over a constant."))
+                        Err(Diagnostic {
+                            message: format!("Line {line_num}: you can only quantify over a variable, not over a constant."),
+                            location: Some(wff.location.clone()),
+                        })
                     } else if bound_vars_in_scope.contains(var) {
-                        Err(format!(
-                            "Line {line_num}: this line contains \
+                        Err(Diagnostic {
+                            message: format!(
+                                "Line {line_num}: this line contains \
                                        two nested quantifiers over the same variable."
-                        ))
+                            ),
+                            location: Some(wff.location.clone()),
+                        })
                     } else {
                         bound_vars_in_scope.push(var.to_string());
                         let res = check_variable_scoping_naming_issues_helper(
                             proof,
-                            wff,
+                            body,
                             line_num,
                             bound_vars_in_scope,
                         );
@@ -587,16 +591,19 @@ impl Proof {
 
         fn check_variable_scoping_naming_issues_helper_term(
             proof: &Proof,
-            term: &Term,
+            term: &LTerm,
             line_num: usize,
             bound_vars_in_scope: &mut Vec<String>,
-        ) -> Result<(), String> {
-            match term {
+        ) -> Result<(), Diagnostic> {
+            match term.value() {
                 Term::Atomic(str) => {
                     if proof.allowed_variable_names.contains(str)
                         && !bound_vars_in_scope.contains(str)
                     {
-                        Err(format!("Line {line_num}: this line contains unbound variables."))
+                        Err(Diagnostic {
+                            message: format!("Line {line_num}: this line contains unbound variables."),
+                            location: Some(term.location.clone()),
+                        })
                     } else {
                         Ok(())
                     }
@@ -612,10 +619,13 @@ impl Proof {
                         )
                     })
                     .and(if proof.allowed_variable_names.contains(name) {
-                        Err(format!(
-                            "Line {line_num}: you cannot have a function called \
+                        Err(Diagnostic {
+                            message: format!(
+                                "Line {line_num}: you cannot have a function called \
                                      {name}, because {name} is a reserved name for variables."
-                        ))
+                            ),
+                            location: Some(term.location.clone()),
+                        })
                     } else {
                         Ok(())
                     }),
