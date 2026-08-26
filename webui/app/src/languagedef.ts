@@ -53,7 +53,7 @@ export const languagedef: monaco.languages.IMonarchLanguage = {
 };
 
 
-export const theme: monaco.editor.IStandaloneThemeData = {
+export const darkTheme: monaco.editor.IStandaloneThemeData = {
   base: "vs-dark",
   inherit: true,
   rules: [

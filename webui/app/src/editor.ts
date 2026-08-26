@@ -214,11 +214,11 @@ export function process_user_input() {
 
 }
 
-export function initEditor() {
+export function initEditor(theme: string) {
   editor = monaco.editor.create(document.getElementById("editor"), {
     // model: initModel,
     language: "fitch",
-    theme: "fitch-theme",
+    theme,
     lineNumbers: "off",
     automaticLayout: true,
     fontFamily: "Fira Code Variable",

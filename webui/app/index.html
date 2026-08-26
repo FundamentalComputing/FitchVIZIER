@@ -2,12 +2,28 @@
 
 <head>
   <meta content="text/html;charset=utf-8" http-equiv="Content-Type" />
+  <script>
+    (() => {
+      let preference = "automatic";
+      try {
+        const savedPreference = localStorage.getItem("theme-preference");
+        if (["automatic", "light", "dark"].includes(savedPreference)) {
+          preference = savedPreference;
+        }
+      } catch {
+        // Automatic mode remains available when storage is unavailable.
+      }
+      const isDark = preference === "dark"
+        || (preference === "automatic" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+      document.documentElement.classList.toggle("dark", isDark);
+    })();
+  </script>
   <link rel="stylesheet" href="./src/style.css">
   <link rel="icon" href="./favicon.ico" />
   <title>FitchVIZIER</title>
 </head>
 
-<body class="text-center pb-4 text-gray-700 dark:bg-black dark:text-white font-[monospace]">
+<body class="text-center pb-4 bg-white text-gray-700 dark:bg-black dark:text-white font-[monospace]">
   <script type="module" src="/src/main.ts"></script>
 
   <header class="py-4">
@@ -77,7 +93,7 @@
         LINE NUMBERS</button>
       <button id="load-example-button" title="Load example proofs">EXAMPLES</button>
       <button id="load-exercise-button" title="Load random exercise">RANDOM EXERCISE</button>
-      <button id="settings-button" title="Toggle visibility of advanced settings">ADVANCED SETTINGS</button>
+      <button id="settings-button" title="Toggle visibility of settings">SETTINGS</button>
     </div>
     <div id="additional-info" hidden
       class="p-2 text-left border-gray-300 dark:border-gray-700 border-1 rounded-[10px] max-w-[100ch] mx-auto mb-2">
@@ -107,9 +123,29 @@
             R(y,x))</a></li>
       </ul>
     </div>
-    <div id="advanced-settings"
+    <div id="settings"
       class="p-2 text-left border-gray-300 dark:border-gray-700 border-1 rounded-[10px] max-w-[100ch] mx-auto mb-2" hidden>
-      <strong>Advanced Settings (do not change unless you really have a good reason)</strong>
+      <strong>Settings</strong>
+      <fieldset class="mt-4">
+        <legend class="font-bold">Appearance</legend>
+        <div class="flex flex-wrap gap-x-6 gap-y-2 mt-2">
+          <label for="theme-automatic" class="cursor-pointer">
+            <input id="theme-automatic" type="radio" name="theme-preference" value="automatic" checked>
+            Automatic
+          </label>
+          <label for="theme-light" class="cursor-pointer">
+            <input id="theme-light" type="radio" name="theme-preference" value="light">
+            Light
+          </label>
+          <label for="theme-dark" class="cursor-pointer">
+            <input id="theme-dark" type="radio" name="theme-preference" value="dark">
+            Dark
+          </label>
+        </div>
+        <p class="mt-2"><em>Automatic follows your system appearance setting.</em></p>
+      </fieldset>
+      <hr class="my-4 border-gray-300 dark:border-gray-700">
+      <strong>Advanced settings (do not change unless you really have a good reason)</strong>
       <br>
       <br>
       <p>List of strings that should be recognized as variables (separated by commas): <input

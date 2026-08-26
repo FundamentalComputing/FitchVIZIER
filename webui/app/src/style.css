@@ -1,5 +1,14 @@
 /* @import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&display=swap'); */
 @import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  color-scheme: light;
+}
+
+:root.dark {
+  color-scheme: dark;
+}
 
 
 footer button {

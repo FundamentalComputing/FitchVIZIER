@@ -9,12 +9,13 @@ import examples from "./examples.ts";
 import exercises from "./exercises.ts";
 
 import Alpine from 'alpinejs';
-import { languagedef, theme, lightTheme } from "./languagedef.ts";
+import { darkTheme, languagedef, lightTheme } from "./languagedef.ts";
 import * as helpers from "./helpers.ts";
 import { initStores } from "./stores.ts";
 import { loadFromLocalStorage, saveToLocalStorage } from "./persistence.ts";
 import { closeTab, initContent, newFile, openFile, renameTab } from "./files.ts";
 import { editor, fix_line_numbers, format, initEditor, process_user_input } from "./editor.ts";
+import { initializeTheme } from "./theme.ts";
 
 const monacoGlobal = globalThis as typeof globalThis & {
   MonacoEnvironment: {
@@ -54,17 +55,16 @@ monaco.languages.register({
   mimetypes: ["text/plain"],
 });
 
-// Define the syntax highlighting rules and color theme
+// Define the syntax highlighting rules and color themes
 monaco.languages.setMonarchTokensProvider("fitch", languagedef);
-const prefersDark = window.matchMedia('(prefers-color-scheme: dark)');
-monaco.editor.defineTheme("fitch-theme", prefersDark.matches ? theme : lightTheme);
+monaco.editor.defineTheme("fitch-dark", darkTheme);
+monaco.editor.defineTheme("fitch-light", lightTheme);
 
-window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (ev: MediaQueryListEvent) => {
-  const isDark = ev.matches;
-  monaco.editor.defineTheme("fitch-theme", isDark ? theme : lightTheme);
+const initialTheme = initializeTheme((effectiveTheme) => {
+  monaco.editor.setTheme(`fitch-${effectiveTheme}`);
 });
 
-initEditor();
+initEditor(`fitch-${initialTheme}`);
 editor.setModel(initModel);
 
 function load_random_exercise() {
@@ -109,13 +109,13 @@ function show_info() {
 }
 
 
-let advanced_settings_are_visible = false;
-function toggle_show_advanced_settings() {
-  advanced_settings_are_visible = !advanced_settings_are_visible;
-  const advancedSettings = document.getElementById("advanced-settings");
-  advancedSettings.hidden = !advanced_settings_are_visible;
-  if (advanced_settings_are_visible) {
-    advancedSettings.scrollIntoView({ behavior: "smooth", block: "start" });
+let settings_are_visible = false;
+function toggle_show_settings() {
+  settings_are_visible = !settings_are_visible;
+  const settings = document.getElementById("settings");
+  settings.hidden = !settings_are_visible;
+  if (settings_are_visible) {
+    settings.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 }
 
@@ -162,7 +162,7 @@ document.getElementById("download-button").onclick = download_proof;
 document.getElementById("upside-down-button").onclick = upside_down;
 document.getElementById("fix-line-numbers-button").onclick = fix_line_numbers;
 document.getElementById("allowed-variable-names").onkeyup = () => process_user_input();
-document.getElementById("settings-button").onclick = toggle_show_advanced_settings;
+document.getElementById("settings-button").onclick = toggle_show_settings;
 
 // tab actions
 document.getElementById("file_open").onclick = openFile;
