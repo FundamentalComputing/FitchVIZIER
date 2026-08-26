@@ -1,4 +1,4 @@
-Error: it seems like you use the name 'b' both to denote a constant, and to denote a function symbol
+line 3:10: Error: it seems like you use the name 'b' both to denote a constant, and to denote a function symbol
 
 line 1:14: Line 1: this line contains unbound variables.
 

@@ -409,4 +409,22 @@ mod diagnostic_tests {
 
         assert_eq!(diagnostic.location, Some(Location::new(None, 6, 10)));
     }
+
+    #[test]
+    fn arity_diagnostic_points_to_a_conflicting_symbol_occurrence() {
+        let proof = "\n1 | P(f(a))\n2 | P(f(a,a))\n  | ---\n3 | P(f(a)) Reit:1";
+        let ProofResult::Error(diagnostics) =
+            check_proof_diagnostics(proof, default_variable_names!())
+        else {
+            panic!("expected arity diagnostic");
+        };
+        let diagnostic = diagnostics
+            .iter()
+            .find(|diagnostic| {
+                diagnostic.message == "Error: it seems like 'f' is meant to denote a function symbol, but throughout the proof, its arity is inconsistent. The found arities are [1, 2]"
+            })
+            .expect("missing arity diagnostic");
+
+        assert_eq!(diagnostic.location, Some(Location::new(None, 2, 7)));
+    }
 }

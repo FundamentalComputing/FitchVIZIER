@@ -1,6 +1,6 @@
 use crate::data::*;
 use crate::formatter;
-use crate::loc::WithLoc;
+use crate::loc::{Location, WithLoc};
 use crate::proof::*;
 use crate::util;
 use std::collections::{HashMap, HashSet};
@@ -228,10 +228,7 @@ impl Proof {
 
         // check that user does not use a symbol to denote both a constant and a function, and that
         // arities of function symbols are consistent throughout the proof.
-        errors.extend(self.generate_arity_errors().into_iter().map(|message| Diagnostic {
-            message,
-            location: None,
-        }));
+        errors.extend(self.generate_arity_errors());
 
         // check that user doesn't use boxed constant outside the subproof and that user does not
         // introduce the same boxed constant twice in nested subproofs, and that boxed constants
@@ -651,88 +648,134 @@ impl Proof {
     /// error messages, if for example from the arity set it can be determined that the user has
     /// functions of inconsistent arity throughout the proof (e.g. they use both f(x) and f(x,x)) or
     /// if for example the user uses some letter both as a constant name and a function name.
-    fn generate_arity_errors(&self) -> Vec<String> {
-        let mut errors: Vec<String> = vec![];
-        let mut arity_map: HashMap<String, Vec<usize>> = HashMap::from([]);
-        for (name, arity) in self.get_arity_set() {
+    fn generate_arity_errors(&self) -> Vec<Diagnostic> {
+        let mut errors: Vec<Diagnostic> = vec![];
+        let mut arity_map: HashMap<String, Vec<(usize, Location)>> = HashMap::from([]);
+        for ((name, arity), location) in self.get_arity_set() {
             if !arity_map.contains_key(&name) {
                 arity_map.insert(name.to_string(), vec![]);
             }
-            if !arity_map.get(&name).unwrap().contains(&arity) {
-                arity_map.get_mut(&name).unwrap().push(arity);
-            }
+            // the previous check makes it safe to unwrap() here
+            arity_map.get_mut(&name).unwrap().push((arity, location));
         }
-        for (name, mut arities) in arity_map {
+        for (name, mut arities_loc) in arity_map {
+            arities_loc.sort_by_key(|(arity, _)| *arity);
+            let arities: Vec<usize> = arities_loc
+                .iter()
+                .map(|(arity, _)| *arity)
+                .collect();
+            // we know that if a variable name appears in an arity map, then there is at least one arity associated with it
             if arities.is_empty() {
-                panic!();
+                panic!("The list of arities is empty -- this should not happen!");
             }
             if arities.len() > 1 {
-                arities.sort();
+                let location = arities_loc.first().map(|(_, loc)| loc.clone());
                 if arities.contains(&0) {
                     if name.chars().next().unwrap().is_lowercase() {
-                        errors.push(format!("Error: it seems like you use the name \'{name}\' both to denote a constant, and to denote a function symbol"));
+                        errors.push(Diagnostic {
+                            message: format!("Error: it seems like you use the name \'{name}\' both to denote a constant, and to denote a function symbol"),
+                            location,
+                        });
                     } else {
-                        errors.push(format!("Error: it seems like you use the name \'{name}\' both to denote a nullary predicate (\'no inputs\'), and to denote a non-nullary predicate"));
+                        errors.push(Diagnostic {
+                            message: format!("Error: it seems like you use the name \'{name}\' both to denote a nullary predicate (\'no inputs\'), and to denote a non-nullary predicate"),
+                            location,
+                        });
                     }
                 } else if name.chars().next().unwrap().is_lowercase() {
-                    errors.push(format!("Error: it seems like \'{name}\' is meant to denote a function symbol, but throughout the proof, its arity is inconsistent. The found arities are {arities:?}"))
+                    errors.push(Diagnostic {
+                        message: format!("Error: it seems like \'{name}\' is meant to denote a function symbol, but throughout the proof, its arity is inconsistent. The found arities are {arities:?}"),
+                        location,
+                    })
                 } else {
-                    errors.push(format!("Error: it seems like \'{name}\' is meant to denote a predicate, but throughout the proof, its arity is inconsistent. The found arities are {arities:?}"))
+                    errors.push(Diagnostic {
+                        message: format!("Error: it seems like \'{name}\' is meant to denote a predicate, but throughout the proof, its arity is inconsistent. The found arities are {arities:?}"),
+                        location,
+                    })
                 }
             }
         }
         errors
     }
 
-    /// This function returns the "arity set" for a proof. This is a HashSet containing instances of
+    /// This function returns the located distinct arities used in the proof. The map keys are
     /// (name,arity), where name can be the name of any constant, funtion symbol, atomic proposition
     /// or predicate, and arity is its arity. Note that the arity of constants and atomic
     /// propositions is defined to be 0. Note that variables are not included in the arity set.
     ///
     /// Note that if you find for example both f(x,x) and f(x,x,x) in the same proof, then BOTH the
     /// entries ("f", 2) and ("f", 3) will be included in the arity set.
-    fn get_arity_set(&self) -> HashSet<(String, usize)> {
-        fn get_arity_set_term(proof: &Proof, term: &Term) -> HashSet<(String, usize)> {
-            match term {
-                Term::Atomic(str) => {
-                    if proof.allowed_variable_names.contains(str) {
-                        HashSet::from([])
-                    } else {
-                        HashSet::from([(str.to_owned(), 0)])
-                    }
-                }
-                Term::FuncApp(str, args) => args
-                    .iter()
-                    .map(|t| get_arity_set_term(proof, t))
-                    .chain(std::iter::once(HashSet::from([(str.to_owned(), args.len())])))
-                    .flatten()
-                    .collect(),
+    fn get_arity_set(&self) -> HashMap<(String, usize), Location> {
+        fn merge_arity_sets(
+            target: &mut HashMap<(String, usize), Location>,
+            source: HashMap<(String, usize), Location>) -> ()
+        {
+            for (key, location) in source {
+                target.entry(key).or_insert(location);
             }
         }
-        fn get_arity_set_wff(proof: &Proof, wff: &Wff) -> HashSet<(String, usize)> {
-            match wff {
-                Wff::Bottom => HashSet::from([]),
-                Wff::And(li) | Wff::Or(li) => {
-                    li.iter().flat_map(|t| get_arity_set_wff(proof, t)).collect()
+
+        fn get_arity_set_term(proof: &Proof, term: &LTerm) -> HashMap<(String, usize), Location> {
+            match term.value() {
+                Term::Atomic(str) => {
+                    if proof.allowed_variable_names.contains(str) {
+                        HashMap::from([])
+                    } else {
+                        HashMap::from([((str.to_owned(), 0), term.location.clone())])
+                    }
                 }
-                Wff::Forall(_, w) | Wff::Exists(_, w) | Wff::Not(w) => {
-                    get_arity_set_wff(proof, w.value())
+                Term::FuncApp(str, args) => {
+                    let mut arities =
+                        HashMap::from([(
+                            (str.to_owned(), args.len()),
+                            term.location.clone())]);
+                    for arg in args {
+                        merge_arity_sets(&mut arities,
+                                         get_arity_set_term(proof, arg));
+                    }
+                    arities
                 }
-                Wff::Bicond(w1, w2) | Wff::Implies(w1, w2) => get_arity_set_wff(proof, w1)
-                    .into_iter()
-                    .chain(get_arity_set_wff(proof, w2.value()))
-                    .collect(),
-                Wff::Equals(t1, t2) => get_arity_set_term(proof, t1)
-                    .into_iter()
-                    .chain(get_arity_set_term(proof, t2))
-                    .collect(),
-                Wff::PredApp(str, args) => args
-                    .iter()
-                    .map(|t| get_arity_set_term(proof, t))
-                    .chain(std::iter::once(HashSet::from([(str.to_owned(), args.len())])))
-                    .flatten()
-                    .collect(),
-                Wff::Atomic(str) => HashSet::from([(str.to_owned(), 0)]),
+            }
+        }
+        fn get_arity_set_wff(proof: &Proof, wff: &LWff) -> HashMap<(String, usize), Location> {
+            match wff.value() {
+                Wff::Bottom => HashMap::from([]),
+                Wff::And(li)
+                  | Wff::Or(li) => {
+                    let mut arities = HashMap::from([]);
+                    for child in li {
+                        merge_arity_sets(&mut arities, get_arity_set_wff(proof, child));
+                    }
+                    arities
+                }
+                Wff::Forall(_, w)
+                  | Wff::Exists(_, w)
+                  | Wff::Not(w) => {
+                    get_arity_set_wff(proof, w)
+                }
+                Wff::Bicond(w1, w2)
+                  | Wff::Implies(w1, w2) => {
+                    let mut arities = get_arity_set_wff(proof, w1);
+                    merge_arity_sets(&mut arities, get_arity_set_wff(proof, w2));
+                    arities
+                }
+                Wff::Equals(t1, t2) => {
+                    let mut arities = get_arity_set_term(proof, t1);
+                    merge_arity_sets(&mut arities, get_arity_set_term(proof, t2));
+                    arities
+                }
+                Wff::PredApp(str, args) => {
+                    let mut arities = HashMap::from([(
+                        (str.to_owned(), args.len()),
+                        wff.location.clone(),
+                    )]);
+                    for arg in args {
+                        merge_arity_sets(&mut arities, get_arity_set_term(proof, arg));
+                    }
+                    arities
+                }
+                Wff::Atomic(str) =>
+                    HashMap::from([((str.to_owned(), 0), wff.location.clone())]),
             }
         }
         self.numbered_lines()
@@ -742,12 +785,15 @@ impl Proof {
                 // also include boxed constants in arity set!
                 self.numbered_lines().filter_map(|line| line.boxed_constant_with_loc()).map(|c| {
                     match c.value() {
-                        Term::Atomic(str) => (str.to_owned(), 0),
+                        Term::Atomic(str) => ((str.to_owned(), 0), c.location.clone()),
                         Term::FuncApp(..) => panic!("boxed constant cannot be FuncApp"),
                     }
                 }),
             )
-            .collect()
+            .fold(HashMap::from([]), |mut arities, (key, location)| {
+                arities.entry(key).or_insert(location);
+                arities
+            })
     }
 
     /// This function returns whether line n1 can reference line n2.

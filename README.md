@@ -66,6 +66,8 @@ python3 -m http.server 8080
 
 And then open [http://localhost:8080/](http://localhost:8080/) in your favorite web browser.
 
+For the development, you can also use `pnpm preview` to run a dev web server that comes with vite.
+
 ## Compiling the legacy web interface
 
 To use the legacy UI (called simpleui in the project), you can build it with `wasm-pack` (to compile Rust to WebAssembly):
