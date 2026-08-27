@@ -164,23 +164,11 @@ impl Proof {
     fn is_fully_correct(&self) -> ProofResult {
         let mut errors: Vec<Diagnostic> = vec![]; // here we accumulate all errors
 
-        // check that user applied proof rule correctly everywhere
-        for node in self.nodes() {
-            if let ProofNode::Numbered(line) = node.value() {
-                if let Err(message) = self.check_line(line) {
-                    errors.push(Diagnostic {
-                        message,
-                        location: Some(node.location.clone()),
-                    });
-                }
-            }
-        }
-
         // check that proof starts with zero or more premises, followed by a Fitch bar
         let mut seen_fitch_bar = false;
-        let mut premises_ok = true;
         for node in self.nodes() {
             match node.value() {
+                // Iterating until we reach the fitch bar
                 ProofNode::FitchBar {
                     ..
                 } => {
@@ -188,21 +176,44 @@ impl Proof {
                     break;
                 }
                 ProofNode::Numbered(line) => {
-                    if line.is_inference() || line.introduces_boxed_constant() {
-                        premises_ok = false;
-                        break;
+                    if line.is_inference() {
+                        errors.push(Diagnostic {
+                            message: format!("Line {}: inferences are not allowed in the premises", line.line_num).to_string(),
+                            location: Some(node.location.clone())
+                        });
+                    }
+                    if line.introduces_boxed_constant() {
+                        errors.push(Diagnostic {
+                            message: format!("Line {}: boxed constants are not allowed in the premises", line.line_num).to_string(),
+                            location: line
+                                .boxed_constant_loc()
+                                .cloned()
+                                .or_else(|| Some(node.location.clone()))
+                        });
+                        // break;
                     }
                 }
                 _ => {}
             }
         }
-        if !seen_fitch_bar || !premises_ok {
+        if !seen_fitch_bar  {
             errors.push(Diagnostic {
                 message: "Each proof should start start with zero or more premises, followed by a Fitch bar"
                     .to_string(),
-                // TODO: more precise error location
-                location: None,
+                location: None
             });
+        }
+        // check that user applied proof rule correctly everywhere
+        for node in self.nodes() {
+            if let ProofNode::Numbered(line) = node.value() {
+                // TODO: more precise location information from check_line()
+                if let Err(message) = self.check_line(line) {
+                    errors.push(Diagnostic {
+                        message,
+                        location: Some(node.location.clone()),
+                    });
+                }
+            }
         }
 
         // check that all inferences have justification

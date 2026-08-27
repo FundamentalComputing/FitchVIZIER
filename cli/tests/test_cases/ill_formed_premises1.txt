@@ -1,0 +1,4 @@
+1 | a = a
+2 | a = a =Intro
+  |--
+3 | a = a  Reit:1

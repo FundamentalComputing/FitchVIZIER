@@ -20,6 +20,9 @@ the template (i.e. matching certain premises and a certain conclusion)
 which is read from STDIN. If the `--no-template` option is selected,
 than the template is skipped.
 
+**Additional options**: there are also options `--debug` for printing out internal representation of proofs; and `--summary` for collecting the summary information about the proof (how many brules were used and how many times).
+
+
 ## Web Version
 
 The web version is available at: <https://fitch.rug.themisjudge.nl/>.

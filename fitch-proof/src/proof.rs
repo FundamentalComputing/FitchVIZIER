@@ -440,7 +440,7 @@ impl Proof {
                 ProofNode::Numbered(line) if line.introduces_boxed_constant() => {
                     let Some(next_idx) = next_meaningful(nodes, i + 1) else {
                         return Err(Diagnostic {
-                            message: "Error: a proof cannot end with a premise.".to_owned(),
+                            message: "Error: a proof cannot end with a boxed constant.".to_owned(),
                             location: Some(nodes[i].location().clone()),
                         });
                     };
@@ -450,7 +450,7 @@ impl Proof {
                         } => {}
                         _ => {
                             return Err(Diagnostic {
-                                message: "Error: after a premise, there should be a Fitch bar"
+                                message: "Error: after a line with a boxed constant, there should be a Fitch bar"
                                     .to_owned(),
                                 location: Some(nodes[next_idx].location().clone()),
                             });

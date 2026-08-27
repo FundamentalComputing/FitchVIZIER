@@ -427,4 +427,38 @@ mod diagnostic_tests {
 
         assert_eq!(diagnostic.location, Some(Location::new(None, 2, 7)));
     }
+
+    #[test]
+    fn missing_initial_fitch_bar_diagnostic_has_no_location() {
+        let proof = "\n1 | P";
+        let ProofResult::Error(diagnostics) =
+            check_proof_diagnostics(proof, default_variable_names!())
+        else {
+            panic!("expected missing-Fitch-bar diagnostic");
+        };
+        let diagnostic = diagnostics
+            .iter()
+            .find(|diagnostic| diagnostic.message.starts_with("Each proof should start"))
+            .expect("missing initial-Fitch-bar diagnostic");
+
+        assert_eq!(diagnostic.location, None);
+    }
+
+    #[test]
+    fn boxed_constant_in_premises_diagnostic_points_to_the_boxed_constant() {
+        let proof = "\n1 | [a]\n  | ---\n2 | P Reit:1";
+        let ProofResult::Error(diagnostics) =
+            check_proof_diagnostics(proof, default_variable_names!())
+        else {
+            panic!("expected invalid-premise diagnostic");
+        };
+        let diagnostic = diagnostics
+            .iter()
+            .find(|diagnostic| {
+                diagnostic.message == "Line 1: boxed constants are not allowed in the premises"
+            })
+            .expect("missing boxed-constant-in-premises diagnostic");
+
+        assert_eq!(diagnostic.location, Some(Location::new(None, 2, 6)));
+    }
 }
