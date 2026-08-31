@@ -13,7 +13,7 @@ Introduction to Logic course at the University of Groningen.
 
 The CLI interface can be used as follows: 
 ```
-./cli file1.txt [file2.txt ...] [--no-template]
+./fitchv file1.txt [file2.txt ...] [--no-template]
 ```
 will run the checker on all the proof filees, checking them against
 the template (i.e. matching certain premises and a certain conclusion)
@@ -47,9 +47,9 @@ building the WebUI you will further need
 
 ## Building the CLI
 
-To build the CLI simply run `cargo build --release` or `cargo install` in the `cli` directory.
+To build the CLI simply run `cargo build --release` or `cargo install --path .` in the `cli` directory.
 If you want to run FitchVIZIER as a CLI or locally, you will need to install Rust, wasm-pack, pnpm, and follow the instructions below.
-The resulting binary is then found in `target/release/` directory.
+The resulting binary is called `fitchv`; release builds are found in the `target/release/` directory.
 
 
 ## Building the WebUI

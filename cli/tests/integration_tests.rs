@@ -24,7 +24,7 @@ fn run_integration_tests() {
 }
 
 fn run_integration_tests_dir(dir : &Path, failed: &mut Vec<String>) {
-    let cli_path = env!("CARGO_BIN_EXE_cli");
+    let cli_path = env!("CARGO_BIN_EXE_fitchv");
     let test_cases_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join(dir);
 
     for entry in fs::read_dir(test_cases_dir).expect("Failed to read test_cases directory") {
@@ -92,7 +92,7 @@ fn run_integration_tests_dir(dir : &Path, failed: &mut Vec<String>) {
 
 #[test]
 fn reuses_template_for_multiple_proofs_2() {
-    let cli_path = env!("CARGO_BIN_EXE_cli");
+    let cli_path = env!("CARGO_BIN_EXE_fitchv");
     let test_cases_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/test_cases");
     let proof_file = test_cases_dir.join("test_socrates.txt");
     let proof_file2 = test_cases_dir.join("test_eq_elim1.txt");
@@ -126,7 +126,7 @@ fn reuses_template_for_multiple_proofs_2() {
 
 #[test]
 fn reuses_template_for_multiple_proofs() {
-    let cli_path = env!("CARGO_BIN_EXE_cli");
+    let cli_path = env!("CARGO_BIN_EXE_fitchv");
     let test_cases_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/test_cases");
     let proof_file = test_cases_dir.join("test_socrates.txt");
     let template = fs::read_to_string(test_cases_dir.join("test_socrates.template"))
@@ -155,4 +155,3 @@ fn reuses_template_for_multiple_proofs() {
         format!("{}\n{}", expected.trim(), expected.trim())
     );
 }
-
