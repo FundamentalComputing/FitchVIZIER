@@ -13,14 +13,22 @@ Introduction to Logic course at the University of Groningen.
 
 The CLI interface can be used as follows: 
 ```
-./fitchv file1.txt [file2.txt ...] [--no-template]
+./fitchv file1.txt [file2.txt ...] [--no-template] [--summary]
 ```
 will run the checker on all the proof filees, checking them against
 the template (i.e. matching certain premises and a certain conclusion)
-which is read from STDIN. If the `--no-template` option is selected,
-than the template is skipped.
+which is read from STDIN. If multiple input files are selected, then
+all of them are checked against the template.
 
-**Additional options**: there are also options `--debug` for printing out internal representation of proofs; and `--summary` for collecting the summary information about the proof (how many brules were used and how many times).
+**Options**:
+
+- If the `--no-template` option is selected, than the template is
+  skipped and no input on STDIN is required.
+- If the `--summary` option is selected, then in addition to the proof
+  checking, FitchVIZIER will print a summary of the proof: which rules
+  were used and how many times, and what is the maximal depth in the
+  proof.
+- Finally the `--debug` option dumps the internal representation is dumped onto STDOUT.  
 
 
 ## Web Version
@@ -28,14 +36,14 @@ than the template is skipped.
 The web version is available at: <https://fitch.rug.themisjudge.nl/>.
 It is features an interactive editor
 [Monaco](https://github.com/microsoft/monaco-editor) with features
-like syntax highlighting, auto-formatting on Ctrl-S, and auto new line
-numbering.
+like syntax highlighting, variable font size, auto-formatting on
+Ctrl-S, and auto new line numbering.
 
 
 ## Contributors
 
-FitchVIZIER is originally written by Aron Hardeman and maintained by Dan Frumin.
-A new WebUI was contributed by Lea Lohrie.
+FitchVIZIER was originally written by Aron Hardeman and is currently
+maintained by Dan Frumin. A new WebUI was contributed by Lea Lohrie.
 
 
 # Building FitchVIZIER

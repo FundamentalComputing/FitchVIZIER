@@ -14,6 +14,7 @@ import {
   format_proof,
   fix_line_numbers_in_proof
 } from "@workspace/library";
+import { minEditorTextSize, updateEditorTextSize } from "./editorTextSize";
 
 export let editor: monaco.editor.IStandaloneCodeEditor;
 
@@ -215,7 +216,7 @@ export function process_user_input() {
 
 }
 
-export function initEditor(theme: string) {
+export function initEditor(theme: string, fontSize: number) {
   editor = monaco.editor.create(document.getElementById("editor"), {
     // model: initModel,
     language: "fitch",
@@ -223,6 +224,7 @@ export function initEditor(theme: string) {
     lineNumbers: "off",
     automaticLayout: true,
     fontFamily: "Fira Code Variable",
+    fontSize,
     fontLigatures: true,
     glyphMargin: true,
     minimap: { enabled: false },
@@ -235,13 +237,15 @@ export function initEditor(theme: string) {
 
   // Add zoom in/out shortcuts to Monaco
   editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Equal, () => {
-    editor.updateOptions({ fontSize: editor.getOption(monaco.editor.EditorOption.fontSize) + 1 });
+    const fontSize = updateEditorTextSize(editor.getOption(monaco.editor.EditorOption.fontSize) + 1);
+    editor.updateOptions({ fontSize });
   });
 
   editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Minus, () => {
     const currentSize = editor.getOption(monaco.editor.EditorOption.fontSize);
-    if (currentSize > 1) {
-      editor.updateOptions({ fontSize: currentSize - 1 });
+    if (currentSize > minEditorTextSize) {
+      const fontSize = updateEditorTextSize(currentSize - 1);
+      editor.updateOptions({ fontSize });
     }
   });
 

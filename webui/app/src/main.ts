@@ -16,6 +16,7 @@ import { loadFromLocalStorage, saveToLocalStorage } from "./persistence.ts";
 import { closeTab, initContent, newFile, openFile, renameTab } from "./files.ts";
 import { editor, fix_line_numbers, format, initEditor, process_user_input } from "./editor.ts";
 import { initializeTheme } from "./theme.ts";
+import { initializeEditorTextSize } from "./editorTextSize.ts";
 
 const monacoGlobal = globalThis as typeof globalThis & {
   MonacoEnvironment: {
@@ -64,7 +65,11 @@ const initialTheme = initializeTheme((effectiveTheme) => {
   monaco.editor.setTheme(`fitch-${effectiveTheme}`);
 });
 
-initEditor(`fitch-${initialTheme}`);
+const initialEditorTextSize = initializeEditorTextSize((fontSize) => {
+  editor?.updateOptions({ fontSize });
+});
+
+initEditor(`fitch-${initialTheme}`, initialEditorTextSize);
 editor.setModel(initModel);
 
 function load_random_exercise() {
