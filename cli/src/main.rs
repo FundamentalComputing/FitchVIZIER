@@ -3,6 +3,7 @@ extern crate fitch_proof;
 use clap::Parser;
 
 mod summary;
+use fitch_proof::format_proof;
 use summary::*;
 
 #[derive(Parser)]
@@ -17,9 +18,11 @@ struct Args {
     summary: bool,
 
     #[arg(long, action)]
+    format: bool,
+
+    #[arg(long, action)]
     debug: bool,
 }
-
 
 /// by default we use a,b,c for constants and x,y,z for variables
 const DEFAULT_ALLOWED_VARIABLE_NAMES: &str = "x,y,z,u,v,w";
@@ -47,13 +50,29 @@ fn main() {
     };
 
     for proof_file in &args.path {
-        check_file(template.as_deref(), proof_file, debug)
+        if args.format {
+            format_file(proof_file);
+        }
+        check_file(template.as_deref(), proof_file, debug);
     }
 
     if summary {
         summaries_files(&args.path);
     }
+}
 
+fn format_file(proof_file: &String) {
+    let Ok(proof) = std::fs::read_to_string(proof_file) else {
+        println!(
+            "{}: Fatal error: Cannot open the file. Aborting.",
+            proof_file
+        );
+        std::process::exit(1)
+    };
+    let proof = format_proof(&proof);
+    if let Err(e) = std::fs::write(proof_file, proof) {
+        println!("{proof_file}: Fatal error: Cannot write back formatted file: {e}");
+    }
 }
 
 fn check_file(template: Option<&[String]>, proof_file : &String, debug: bool) {
