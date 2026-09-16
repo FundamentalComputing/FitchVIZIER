@@ -445,6 +445,22 @@ mod diagnostic_tests {
     }
 
     #[test]
+    fn missing_top_level_fitch_bar_is_rejected() {
+        // The top-level proof has no Fitch bar of its own; the only one present belongs to the
+        // subproof on lines 2-3, which must not count as the initial Fitch bar.
+        let proof = "\n1 | P\n2 | | ¬P\n  | | ---\n3 | | ⊥ ⊥Intro:1,2\n4 | ¬¬P ¬Intro:2-3";
+        let ProofResult::Error(diagnostics) =
+            check_proof_diagnostics(proof, default_variable_names!())
+        else {
+            panic!("expected missing-Fitch-bar diagnostic");
+        };
+
+        assert!(diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.message.starts_with("Each proof should start")));
+    }
+
+    #[test]
     fn boxed_constant_in_premises_diagnostic_points_to_the_boxed_constant() {
         let proof = "\n1 | [a]\n  | ---\n2 | P Reit:1";
         let ProofResult::Error(diagnostics) =

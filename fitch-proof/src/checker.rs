@@ -169,12 +169,19 @@ impl Proof {
         for node in self.nodes() {
             match node.value() {
                 // Iterating until we reach the fitch bar
+                // at the outer depth
                 ProofNode::FitchBar {
-                    ..
-                } => {
+                    depth,
+                } if *depth == TOP_LEVEL_DEPTH => {
                     seen_fitch_bar = true;
                     break;
                 }
+                // If we reach the Fitch bar with the bigger depth,
+                // then we have already passed up the opportunity for
+                // the first Fitch bar, and we can stop early
+                ProofNode::FitchBar {
+                    ..
+                } => break,
                 ProofNode::Numbered(line) => {
                     if line.is_inference() {
                         errors.push(Diagnostic {

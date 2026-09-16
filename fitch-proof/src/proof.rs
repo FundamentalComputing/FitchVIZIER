@@ -18,6 +18,9 @@ use std::collections::HashSet;
 /// The first index `scope[0]` is unused.
 pub type Scope = Vec<(Vec<usize>, Vec<(usize, usize)>)>;
 
+/// The depth of the outermost scope of a proof. Every subproof lives at a strictly greater depth.
+pub const TOP_LEVEL_DEPTH: usize = 1;
+
 /// A [Proof] is a fundamental entity in this program. It contains important information that can
 /// be used to assess whether the proof is correct.
 ///
